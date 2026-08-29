@@ -1,0 +1,10 @@
+# Lefthook configuration
+# https://github.com/evilmartians/lefthook
+# Format only — generated shadcn/BTS code fails Ultracite's full rule set.
+
+pre-commit:
+  parallel: true
+  jobs:
+    - name: oxfmt
+      glob: "*.{js,jsx,ts,tsx,mjs,cjs,json,jsonc,css}"
+      run: bunx oxfmt --check {staged_files}

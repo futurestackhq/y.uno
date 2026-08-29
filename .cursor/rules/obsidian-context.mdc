@@ -1,0 +1,24 @@
+---
+description: This project has Obsidian vault documentation — read it for context
+alwaysApply: true
+---
+
+# Obsidian Vault Context
+
+Project documentation:
+
+`~/Library/Mobile Documents/iCloud~md~obsidian/Documents/AI Docs/FutureStack/`
+
+Start here:
+
+`~/Library/Mobile Documents/iCloud~md~obsidian/Documents/AI Docs/FutureStack/FutureStack Index.md`
+
+Vault map:
+
+`~/Library/Mobile Documents/iCloud~md~obsidian/Documents/Vault Index.md`
+
+Personal notes live under `Notes/` — not the default location for technical runbooks.
+
+When finishing significant work, use the `obsidian-docs` skill to update the vault.
+
+Local-only Saturday exclude (gitignored): `docs/local/`. Do not copy that folder into the official hackathon GitHub.
