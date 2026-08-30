@@ -15,6 +15,13 @@
       "when": 1788063016756,
       "tag": "0001_curious_adam_destine",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1788063390915,
+      "tag": "0002_romantic_annihilus",
+      "breakpoints": true
     }
   ]
 }

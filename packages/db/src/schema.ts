@@ -1,4 +1,9 @@
-import { integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
+import {
+  integer,
+  sqliteTable,
+  text,
+  uniqueIndex,
+} from "drizzle-orm/sqlite-core";
 
 const now = () => new Date().toISOString();
 
@@ -72,18 +77,26 @@ export const messages = sqliteTable("messages", {
   userId: text("user_id").notNull(),
 });
 
-export const messageQueue = sqliteTable("message_queue", {
-  error: text("error"),
-  id: text("id").primaryKey(),
-  idempotencyKey: text("idempotency_key"),
-  payloadJson: text("payload_json").notNull(),
-  receivedAt: text("received_at").notNull().$defaultFn(now),
-  status: text("status", {
-    enum: ["pending", "processing", "done", "failed"],
-  }).notNull(),
-  type: text("type").notNull(),
-  userId: text("user_id").notNull(),
-});
+export const messageQueue = sqliteTable(
+  "message_queue",
+  {
+    error: text("error"),
+    id: text("id").primaryKey(),
+    idempotencyKey: text("idempotency_key"),
+    payloadJson: text("payload_json").notNull(),
+    receivedAt: text("received_at").notNull().$defaultFn(now),
+    status: text("status", {
+      enum: ["pending", "processing", "done", "failed"],
+    }).notNull(),
+    type: text("type").notNull(),
+    userId: text("user_id").notNull(),
+  },
+  (table) => ({
+    userIdIdempotencyKeyUnique: uniqueIndex(
+      "message_queue_user_id_idempotency_key_unique"
+    ).on(table.userId, table.idempotencyKey),
+  })
+);
 
 export const jobs = sqliteTable("jobs", {
   attempts: integer("attempts").notNull(),
