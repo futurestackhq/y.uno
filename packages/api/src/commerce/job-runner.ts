@@ -4,6 +4,7 @@ import { and, asc, eq, isNull, lte, or } from "drizzle-orm";
 
 import { logEvent, logProgressLine } from "./events";
 import { runHostPlan, runHostSynthesis } from "./host-agent";
+import type { HostModel } from "./host-agent";
 import { assembleHostContext } from "./host-context";
 import {
   canDelegatePlan,
@@ -482,12 +483,13 @@ const materializeDecisionNodes = async (
   );
 };
 
-const runHostPlanJob = async (db: Db, job: JobRow) => {
+const runHostPlanJob = async (db: Db, job: JobRow, model?: HostModel) => {
   const input = parseJson<{ envelope: Envelope }>(job.inputJson);
   const snapshot = await assembleHostContext(db, { envelope: input.envelope });
   const decision = await runHostPlan({
     db,
     envelope: input.envelope,
+    model,
     snapshot,
   });
   const persisted = await persistHostPlan(db, {
@@ -694,7 +696,7 @@ const runSpecializedPlanNode = async (db: Db, job: JobRow) => {
   await scheduleHostSynthesis(db, job.planId as string);
 };
 
-const runJob = async (db: Db, job: JobRow) => {
+const runJob = async (db: Db, job: JobRow, model?: HostModel) => {
   await logEvent(db, {
     data: { attempt: job.attempts, jobKind: job.kind },
     eventType: "job_started",
@@ -714,7 +716,7 @@ const runJob = async (db: Db, job: JobRow) => {
           sessionRevision: session.revision,
         })
       ) {
-        await completeJob(db, job, { planSuperseded: true });
+        await completeJob(db, job, { planSuperseded: true }, {});
         await logEvent(db, {
           data: { planId: job.planId },
           eventType: "plan_superseded" as "job_done",
@@ -726,7 +728,7 @@ const runJob = async (db: Db, job: JobRow) => {
       }
     }
     if (job.kind === "host_plan") {
-      await runHostPlanJob(db, job);
+      await runHostPlanJob(db, job, model);
     } else if (job.kind === "rank_catalog") {
       await runRankCatalog(db, job);
     } else if (job.kind === "compose_reply") {
@@ -750,6 +752,7 @@ const runJob = async (db: Db, job: JobRow) => {
         })),
         db,
         envelope,
+        model,
       });
       await persistHostSynthesis(db, {
         decision,
@@ -757,7 +760,7 @@ const runJob = async (db: Db, job: JobRow) => {
         plan,
         session,
       });
-      await completeJob(db, job, decision);
+      await completeJob(db, job, decision, {});
     } else if (
       [
         "catalog_search",
@@ -777,7 +780,7 @@ const runJob = async (db: Db, job: JobRow) => {
 
 export const runJobsOnce = async (
   db: Db,
-  params: { limit: number }
+  params: { limit: number; model?: HostModel }
 ): Promise<{ ran: number }> => {
   const runNext = async (remaining: number, ran: number): Promise<number> => {
     if (remaining <= 0) {
@@ -789,7 +792,7 @@ export const runJobsOnce = async (
       return ran;
     }
 
-    await runJob(db, job);
+    await runJob(db, job, params.model);
     return await runNext(remaining - 1, ran + 1);
   };
 

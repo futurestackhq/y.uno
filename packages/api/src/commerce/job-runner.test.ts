@@ -1,10 +1,21 @@
 import { describe, expect, it } from "bun:test";
 
+import type { HostModel } from "./host-agent";
 import {
   hasComposeReplyMarker,
   hasSourceJobId,
   rankCatalogItems,
 } from "./job-runner-helpers";
+
+it("supports a deterministic host adapter for replay tests", () => {
+  const host: HostModel = {
+    plan: () => Promise.reject(new Error("fixture only")),
+    synthesize: () => Promise.reject(new Error("fixture only")),
+  };
+
+  expect(typeof host.plan).toBe("function");
+  expect(typeof host.synthesize).toBe("function");
+});
 
 describe("rankCatalogItems", () => {
   it("prioritizes active matching catalog items", () => {
