@@ -1,3 +1,5 @@
+import { schema } from "@hackathon/db";
+import { and, asc, eq, inArray, sql } from "drizzle-orm";
 import { z } from "zod";
 
 import {
@@ -18,8 +20,42 @@ const sessionIdInput = z
 const messagesInput = z
   .object({ sessionId: z.string().optional(), userId: z.string().optional() })
   .optional();
+const sessionInspectorInput = z.object({ sessionId: z.string() });
+const jobLogsInput = z.object({ jobId: z.string() });
+const pendingWorkInput = z
+  .object({ sessionId: z.string().optional(), userId: z.string().optional() })
+  .optional();
+
+const activeJobStatuses = ["queued", "running"] as const;
+const activeMessageQueueStatuses = ["pending", "processing"] as const;
+
+const parseJsonOrRaw = (value: string | null): unknown => {
+  if (!value) {
+    return null;
+  }
+
+  try {
+    return JSON.parse(value);
+  } catch {
+    return value;
+  }
+};
 
 export const commerceRouter = router({
+  getJobLogs: publicProcedure
+    .input(jobLogsInput)
+    .query(
+      async ({ ctx, input }) =>
+        await ctx.db
+          .select()
+          .from(schema.executionLogs)
+          .where(eq(schema.executionLogs.jobId, input.jobId))
+          .orderBy(
+            asc(schema.executionLogs.createdAt),
+            asc(schema.executionLogs.id)
+          )
+          .limit(500)
+    ),
   getLogs: publicProcedure
     .input(sessionIdInput)
     .query(async ({ ctx, input }) => {
@@ -31,6 +67,122 @@ export const commerceRouter = router({
     .query(async ({ ctx, input }) => {
       const userId = input?.userId ?? "user_marta";
       return await listMessages(ctx.db, userId, input?.sessionId);
+    }),
+  getPendingWork: publicProcedure
+    .input(pendingWorkInput)
+    .query(async ({ ctx, input }) => {
+      const [jobCounts, messageQueueCounts] = await Promise.all([
+        ctx.db
+          .select({
+            count: sql<number>`count(*)`,
+            status: schema.jobs.status,
+          })
+          .from(schema.jobs)
+          .where(
+            and(
+              inArray(schema.jobs.status, activeJobStatuses),
+              input?.sessionId
+                ? eq(schema.jobs.sessionId, input.sessionId)
+                : sql`1=1`
+            )
+          )
+          .groupBy(schema.jobs.status),
+        ctx.db
+          .select({
+            count: sql<number>`count(*)`,
+            status: schema.messageQueue.status,
+          })
+          .from(schema.messageQueue)
+          .where(
+            and(
+              inArray(schema.messageQueue.status, activeMessageQueueStatuses),
+              input?.userId
+                ? eq(schema.messageQueue.userId, input.userId)
+                : sql`1=1`
+            )
+          )
+          .groupBy(schema.messageQueue.status),
+      ]);
+
+      const jobs = {
+        queued: 0,
+        running: 0,
+      };
+      for (const row of jobCounts) {
+        jobs[row.status] = row.count;
+      }
+
+      const messageQueue = {
+        pending: 0,
+        processing: 0,
+      };
+      for (const row of messageQueueCounts) {
+        messageQueue[row.status] = row.count;
+      }
+
+      return {
+        counts: {
+          jobs,
+          messageQueue,
+        },
+        pending:
+          jobs.queued > 0 ||
+          jobs.running > 0 ||
+          messageQueue.pending > 0 ||
+          messageQueue.processing > 0,
+      } as const;
+    }),
+  getSessionInspector: publicProcedure
+    .input(sessionInspectorInput)
+    .query(async ({ ctx, input }) => {
+      const [session] = await ctx.db
+        .select()
+        .from(schema.sessions)
+        .where(eq(schema.sessions.id, input.sessionId))
+        .limit(1);
+
+      if (!session) {
+        return null;
+      }
+
+      const jobs = await ctx.db
+        .select({
+          attempts: schema.jobs.attempts,
+          errorText: schema.jobs.errorText,
+          finishedAt: schema.jobs.finishedAt,
+          id: schema.jobs.id,
+          inputJson: schema.jobs.inputJson,
+          kind: schema.jobs.kind,
+          promptText: schema.jobs.promptText,
+          resultJson: schema.jobs.resultJson,
+          startedAt: schema.jobs.startedAt,
+          status: schema.jobs.status,
+          subagentName: schema.jobs.subagentName,
+        })
+        .from(schema.jobs)
+        .where(eq(schema.jobs.sessionId, input.sessionId))
+        .orderBy(asc(schema.jobs.createdAt), asc(schema.jobs.id));
+
+      const jobCounts = {
+        done: 0,
+        failed: 0,
+        queued: 0,
+        running: 0,
+      };
+      for (const job of jobs) {
+        jobCounts[job.status] += 1;
+      }
+
+      return {
+        jobCounts,
+        jobs: jobs.map((job) => ({
+          ...job,
+          input: parseJsonOrRaw(job.inputJson),
+          result: parseJsonOrRaw(job.resultJson),
+        })),
+        plan: parseJsonOrRaw(session.planJson),
+        session,
+      } as const;
     }),
   getSessions: publicProcedure
     .input(userIdInput)
