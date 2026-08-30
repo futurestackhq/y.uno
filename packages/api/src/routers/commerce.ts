@@ -10,6 +10,7 @@ import {
   tickOnce,
 } from "../commerce/orchestrator";
 import { processWork } from "../commerce/process";
+import { resetCommerceDemoData } from "../commerce/reset";
 import { envelopeSchema } from "../commerce/types";
 import { publicProcedure, router } from "../index";
 
@@ -210,6 +211,9 @@ export const commerceRouter = router({
       const userId = input?.userId ?? "user_marta";
       return await listSessions(ctx.db, userId);
     }),
+  resetDemoData: publicProcedure.mutation(
+    async ({ ctx }) => await resetCommerceDemoData(ctx.db)
+  ),
   sendEnvelope: publicProcedure
     .input(envelopeSchema)
     .mutation(async ({ ctx, input }) => {
