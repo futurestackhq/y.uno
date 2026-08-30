@@ -140,6 +140,7 @@ const getRemoteMessage = (
           description: getValue(card, "subtitle") || getValue(card, "merchant"),
           eyebrow: getValue(card, "merchant") || "Option",
           id: getValue(card, "id") || `remote-card-${index}`,
+          imageUrl: getValue(card, "imageUrl") || undefined,
           price: getValue(card, "price"),
           title,
           tone: [

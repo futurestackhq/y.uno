@@ -243,7 +243,16 @@ const CarouselMessage = ({ message, onAction }: CarouselMessageProps) => {
               className="w-75 shrink-0 overflow-hidden rounded-[7.5px] bg-white shadow-sm"
               key={card.id}
             >
-              <div className={`h-40 bg-linear-to-br ${card.tone}`} />
+              <div className={`h-40 bg-linear-to-br ${card.tone}`}>
+                {card.imageUrl ? (
+                  <img
+                    alt={card.title}
+                    className="h-full w-full object-cover"
+                    loading="lazy"
+                    src={card.imageUrl}
+                  />
+                ) : null}
+              </div>
               <div className="px-3 py-2">
                 <p className="truncate text-[14px] leading-5 text-[#111b21]">
                   {card.title}

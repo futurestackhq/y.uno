@@ -5,15 +5,13 @@ import { sql } from "drizzle-orm";
 const toAttributesJson = (attributes: Record<string, unknown>) =>
   JSON.stringify(attributes);
 
-export const seedDemoData = async (db: Db) => {
-  const existing = await db
-    .select({ count: sql<number>`count(*)` })
-    .from(schema.connections);
-  const count = existing.at(0)?.count ?? 0;
-  if (count > 0) {
-    return;
-  }
+const D1_MAX_BOUND_PARAMETERS = 100;
+const CATALOG_ITEM_PARAMETER_COUNT = 11;
+const CATALOG_SEED_BATCH_SIZE = Math.floor(
+  D1_MAX_BOUND_PARAMETERS / CATALOG_ITEM_PARAMETER_COUNT
+);
 
+export const seedDemoData = async (db: Db) => {
   const nowIso = new Date().toISOString();
 
   const connections = [
@@ -54,8 +52,6 @@ export const seedDemoData = async (db: Db) => {
       type: "product" as const,
     },
   ];
-
-  await db.insert(schema.connections).values(connections);
 
   const catalogItems = [
     {
@@ -220,11 +216,37 @@ export const seedDemoData = async (db: Db) => {
     },
   ];
 
-  await db.insert(schema.connectionCatalogItems).values(
-    catalogItems.map((i) => ({
-      ...i,
-      imageUrl: i.imageUrl ?? undefined,
-      subtitle: i.subtitle ?? undefined,
-    }))
+  const [existingCatalog] = await db
+    .select({ count: sql<number>`count(*)` })
+    .from(schema.connectionCatalogItems);
+  if ((existingCatalog?.count ?? 0) >= catalogItems.length) {
+    return;
+  }
+
+  await db.insert(schema.connections).values(connections).onConflictDoNothing();
+
+  const catalogBatches = [];
+  for (
+    let offset = 0;
+    offset < catalogItems.length;
+    offset += CATALOG_SEED_BATCH_SIZE
+  ) {
+    catalogBatches.push(
+      catalogItems
+        .slice(offset, offset + CATALOG_SEED_BATCH_SIZE)
+        .map((item) => ({
+          ...item,
+          imageUrl: item.imageUrl ?? undefined,
+          subtitle: item.subtitle ?? undefined,
+        }))
+    );
+  }
+  await Promise.all(
+    catalogBatches.map((batch) =>
+      db
+        .insert(schema.connectionCatalogItems)
+        .values(batch)
+        .onConflictDoNothing()
+    )
   );
 };

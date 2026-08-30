@@ -12,6 +12,7 @@ export interface CarouselCard {
   price: string;
   actionLabel: string;
   tone: string;
+  imageUrl?: string;
 }
 
 export interface ListItem {
