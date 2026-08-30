@@ -10,25 +10,21 @@ describe("buildPlan", () => {
 
     expect(plan.nodes).toHaveLength(3);
     expect(uniqueNodeIds.size).toBe(3);
-    expect(nodeIds).toEqual([
-      "classify_intent",
-      "rank_catalog",
-      "compose_reply",
-    ]);
+    expect(nodeIds).toEqual(["host_plan", "rank_catalog", "compose_reply"]);
 
     const nodeById = new Map(plan.nodes.map((n) => [n.id, n] as const));
-    const classifyIntent = nodeById.get("classify_intent");
+    const hostPlan = nodeById.get("host_plan");
     const rankCatalog = nodeById.get("rank_catalog");
     const composeReply = nodeById.get("compose_reply");
 
-    expect(classifyIntent).toBeTruthy();
+    expect(hostPlan).toBeTruthy();
     expect(rankCatalog).toBeTruthy();
     expect(composeReply).toBeTruthy();
 
-    expect(rankCatalog?.deps).toEqual(["classify_intent"]);
+    expect(rankCatalog?.deps).toEqual(["host_plan"]);
     expect(composeReply?.deps).toEqual(["rank_catalog"]);
 
-    expect(classifyIntent?.status).toBe("ready");
+    expect(hostPlan?.status).toBe("ready");
     expect(composeReply?.status).toBe("pending");
   });
 
@@ -49,7 +45,7 @@ describe("normalizePlanJson", () => {
     const plan = normalizePlanJson("{}", "unknown");
 
     expect(plan.nodes.map((node) => node.id)).toEqual([
-      "classify_intent",
+      "host_plan",
       "rank_catalog",
       "compose_reply",
     ]);
@@ -89,7 +85,7 @@ describe("normalizePlanJson", () => {
       "done"
     );
     expect(plan.nodes.map((node) => node.id)).toEqual([
-      "classify_intent",
+      "host_plan",
       "rank_catalog",
       "compose_reply",
       "custom_step",

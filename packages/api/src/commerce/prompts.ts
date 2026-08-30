@@ -6,6 +6,8 @@ interface SessionLite {
 interface DelegationPromptParams {
   kind: string;
   input: unknown;
+  nodeId?: string | null;
+  planId?: string | null;
   session: SessionLite;
 }
 
@@ -142,6 +144,8 @@ export const buildDelegationPrompt = (
     "Do not return markdown. Do not wrap JSON in code fences.",
     "",
     `Task kind: ${params.kind}`,
+    `Plan id: ${params.planId ?? "none"}`,
+    `Node id: ${params.nodeId ?? "none"}`,
     `Session id: ${params.session.id}`,
     `Session intent: ${params.session.intent}`,
     "",
