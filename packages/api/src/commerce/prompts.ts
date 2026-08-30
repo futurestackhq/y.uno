@@ -114,6 +114,8 @@ const hostPlanningInstructions = [
   "Keep simple social replies to one short sentence; be polite, direct, and avoid promotional filler.",
   "This is a marketplace of stores offering products or services, so gently guide the user toward what they want to find.",
   'For a bare greeting in Portuguese, prefer: "Olá! O que você procura hoje?"',
+  "Interpret quick replies deterministically: details means plan catalog_details with its catalogItemId; buy means plan create_order with its catalogItemId; pay_now, swap_card, and confirm_payment mean plan prepare_checkout with its orderId.",
+  "When a quick reply includes the required ID, do not ask for clarification before delegating its corresponding commerce action.",
   "Represent entities, constraints, and references as arrays of { key, value } facts.",
   "In plan node input, fill the field required by the node kind and set every unrelated field to null.",
   "Never expose private reasoning; decisionSummary must be a concise user-safe operational rationale.",

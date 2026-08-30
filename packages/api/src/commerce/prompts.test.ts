@@ -16,6 +16,8 @@ describe("buildHostPlanningPrompt", () => {
       "marketplace of stores offering products or services"
     );
     expect(prompt).toContain("one short sentence");
+    expect(prompt).toContain("details means plan catalog_details");
+    expect(prompt).toContain("buy means plan create_order");
   });
 });
 

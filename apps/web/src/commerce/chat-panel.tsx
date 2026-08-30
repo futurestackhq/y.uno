@@ -89,6 +89,30 @@ const getOrderId = (value: unknown): string | null => {
   return getString(v.orderId) ?? getString(v.order_id);
 };
 
+const getQuickReplyMessage = (value: unknown): string | null => {
+  if (!value || typeof value !== "object") {
+    return null;
+  }
+
+  const { quickReply } = value as { quickReply?: unknown };
+  if (quickReply === "details") {
+    return "Ver detalhes do item";
+  }
+  if (quickReply === "buy") {
+    return "Comprar este item";
+  }
+  if (quickReply === "pay_now") {
+    return "Pagar agora";
+  }
+  if (quickReply === "swap_card") {
+    return "Trocar cartão";
+  }
+  if (quickReply === "confirm_payment") {
+    return "Confirmar compra";
+  }
+  return null;
+};
+
 const normalizeCtas = (value: unknown): CarouselCard["ctas"] => {
   if (!Array.isArray(value)) {
     return [];
@@ -426,13 +450,16 @@ export const ChatPanel = (props: {
                       </div>
                     );
                   } else {
+                    const quickReplyMessage =
+                      m.role === "user" ? getQuickReplyMessage(parsed) : null;
                     const textValue =
-                      typeof parsed === "object" &&
+                      quickReplyMessage ??
+                      (typeof parsed === "object" &&
                       parsed !== null &&
                       "text" in parsed &&
                       typeof (parsed as { text?: unknown }).text === "string"
                         ? (parsed as { text: string }).text
-                        : JSON.stringify(parsed);
+                        : JSON.stringify(parsed));
                     bubbleBody = (
                       <div className="text-sm whitespace-pre-wrap">
                         {textValue}
