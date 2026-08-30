@@ -2,9 +2,13 @@ import type { AppRouter } from "@hackathon/api/routers/index";
 import { env } from "@hackathon/env/web";
 import { createTRPCClient, httpBatchLink } from "@trpc/client";
 
-const serverUrl = env.VITE_SERVER_URL.endsWith("/")
-  ? env.VITE_SERVER_URL.slice(0, -1)
+const configuredServerUrl = import.meta.env.DEV
+  ? "http://localhost:3003"
   : env.VITE_SERVER_URL;
+
+const serverUrl = configuredServerUrl.endsWith("/")
+  ? configuredServerUrl.slice(0, -1)
+  : configuredServerUrl;
 
 export const trpcClient = createTRPCClient<AppRouter>({
   links: [

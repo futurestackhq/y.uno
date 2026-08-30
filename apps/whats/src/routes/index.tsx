@@ -91,6 +91,7 @@ const WhatsPlaceholder = () => {
       conversations={conversations}
       isMetaFlowsOpen={isMetaFlowsOpen}
       onCloseMetaFlows={() => setIsMetaFlowsOpen(false)}
+      onOpenMandate={() => setIsMetaFlowsOpen(true)}
       checkoutOrderId={checkoutOrderId}
       onCloseCheckout={closeCheckout}
       onCompletePayment={async (orderId, savedPaymentMethod) => {

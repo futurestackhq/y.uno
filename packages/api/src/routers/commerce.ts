@@ -36,6 +36,18 @@ const messagesInput = z
 const sessionInspectorInput = z.object({ sessionId: z.string() });
 const jobLogsInput = z.object({ jobId: z.string() });
 const checkoutOrderInput = z.object({ orderId: z.string() });
+const allowedMandateMerchantIds = [
+  "conn_petz",
+  "conn_raia",
+  "conn_oxxo",
+  "conn_carrefour",
+] as const;
+const purchaseMandateInput = z.object({
+  allowedMerchantIds: z.array(z.enum(allowedMandateMerchantIds)).min(1).max(4),
+  expiresAt: z.iso.datetime(),
+  isActive: z.boolean(),
+  maxAmountCents: z.number().int().min(100).max(1_000_000),
+});
 const checkoutQuantityInput = z.object({
   orderId: z.string(),
   quantity: z.number().int().min(1).max(99),
@@ -294,6 +306,15 @@ export const commerceRouter = router({
           messageQueue.processing > 0,
       } as const;
     }),
+  getPurchaseMandate: publicProcedure.query(async ({ ctx }) => {
+    const [mandate] = await ctx.db
+      .select()
+      .from(schema.purchaseMandates)
+      .where(eq(schema.purchaseMandates.userId, DEMO_USER_ID))
+      .orderBy(desc(schema.purchaseMandates.updatedAt))
+      .limit(1);
+    return mandate ?? null;
+  }),
   getSessionInspector: publicProcedure
     .input(sessionInspectorInput)
     .query(async ({ ctx, input }) => {
@@ -392,6 +413,52 @@ export const commerceRouter = router({
         processWork(ctx.db, { maxDispatch: 25, maxJobs: 25 })
       );
       return { ok: true } as const;
+    }),
+  setPurchaseMandate: publicProcedure
+    .input(purchaseMandateInput)
+    .mutation(async ({ ctx, input }) => {
+      const now = new Date();
+      const nowIso = now.toISOString();
+      const [existingMandate] = await ctx.db
+        .select()
+        .from(schema.purchaseMandates)
+        .where(eq(schema.purchaseMandates.userId, DEMO_USER_ID))
+        .orderBy(desc(schema.purchaseMandates.updatedAt))
+        .limit(1);
+
+      if (existingMandate) {
+        await ctx.db
+          .update(schema.purchaseMandates)
+          .set({
+            allowedMerchantIdsJson: JSON.stringify(input.allowedMerchantIds),
+            expiresAt: input.expiresAt,
+            isActive: input.isActive,
+            maxAmountCents: input.maxAmountCents,
+            updatedAt: nowIso,
+          })
+          .where(eq(schema.purchaseMandates.id, existingMandate.id));
+        return {
+          ...existingMandate,
+          allowedMerchantIdsJson: JSON.stringify(input.allowedMerchantIds),
+          expiresAt: input.expiresAt,
+          isActive: input.isActive,
+          maxAmountCents: input.maxAmountCents,
+          updatedAt: nowIso,
+        };
+      }
+
+      const mandate = {
+        allowedMerchantIdsJson: JSON.stringify(input.allowedMerchantIds),
+        createdAt: nowIso,
+        expiresAt: input.expiresAt,
+        id: crypto.randomUUID(),
+        isActive: input.isActive,
+        maxAmountCents: input.maxAmountCents,
+        updatedAt: nowIso,
+        userId: DEMO_USER_ID,
+      };
+      await ctx.db.insert(schema.purchaseMandates).values(mandate);
+      return mandate;
     }),
   tick: publicProcedure.mutation(async ({ ctx }) => await tickOnce(ctx.db)),
   updateCheckoutQuantity: publicProcedure

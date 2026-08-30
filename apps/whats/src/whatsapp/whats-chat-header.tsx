@@ -5,11 +5,13 @@ import type { ConversationFixture } from "@/fixtures/conversations";
 
 interface WhatsChatHeaderProps {
   conversation: ConversationFixture;
+  onOpenMandate: () => void;
   onResetChat: () => void;
 }
 
 export const WhatsChatHeader = ({
   conversation,
+  onOpenMandate,
   onResetChat,
 }: WhatsChatHeaderProps) => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -67,6 +69,16 @@ export const WhatsChatHeader = ({
       </nav>
       {isMenuOpen ? (
         <div className="absolute top-12 right-3 z-20 w-44 rounded-md border border-[#d1d7db] bg-white py-1 shadow-lg">
+          <button
+            className="w-full px-4 py-2.5 text-left text-sm text-[#111b21] hover:bg-[#f0f2f5]"
+            onClick={() => {
+              onOpenMandate();
+              setIsMenuOpen(false);
+            }}
+            type="button"
+          >
+            Purchase mandate
+          </button>
           <button
             className="w-full px-4 py-2.5 text-left text-sm text-[#111b21] hover:bg-[#f0f2f5]"
             onClick={() => {

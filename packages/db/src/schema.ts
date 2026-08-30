@@ -196,6 +196,7 @@ export const orders = sqliteTable("orders", {
   createdAt: text("created_at").notNull().$defaultFn(now),
   currency: text("currency").notNull(),
   id: text("id").primaryKey(),
+  mandateId: text("mandate_id"),
   paymentMethodId: text("payment_method_id"),
   sessionId: text("session_id").notNull(),
   status: text("status", {
@@ -203,6 +204,17 @@ export const orders = sqliteTable("orders", {
   }).notNull(),
   totalCents: integer("total_cents").notNull(),
   updatedAt: text("updated_at").notNull().$defaultFn(now),
+});
+
+export const purchaseMandates = sqliteTable("purchase_mandates", {
+  allowedMerchantIdsJson: text("allowed_merchant_ids_json").notNull(),
+  createdAt: text("created_at").notNull().$defaultFn(now),
+  expiresAt: text("expires_at").notNull(),
+  id: text("id").primaryKey(),
+  isActive: integer("is_active", { mode: "boolean" }).notNull(),
+  maxAmountCents: integer("max_amount_cents").notNull(),
+  updatedAt: text("updated_at").notNull().$defaultFn(now),
+  userId: text("user_id").notNull(),
 });
 
 export const orderItems = sqliteTable("order_items", {
@@ -236,6 +248,7 @@ export const schema = {
   orderItems,
   orders,
   paymentMethods,
+  purchaseMandates,
   sessions,
   users,
 } as const;
