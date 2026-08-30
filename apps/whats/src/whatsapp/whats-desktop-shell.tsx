@@ -12,6 +12,7 @@ interface WhatsDesktopShellProps {
   children: React.ReactNode;
   isMetaFlowsOpen: boolean;
   onCloseMetaFlows: () => void;
+  onOpenMandate: () => void;
   onResetChat: () => void;
   checkoutOrderId: string | null;
   onCloseCheckout: () => void;
@@ -28,6 +29,7 @@ export const WhatsDesktopShell = ({
   children,
   isMetaFlowsOpen,
   onCloseMetaFlows,
+  onOpenMandate,
   onResetChat,
   checkoutOrderId,
   onCloseCheckout,
@@ -42,6 +44,7 @@ export const WhatsDesktopShell = ({
     <section className="flex min-w-0 flex-1 flex-col">
       <WhatsChatHeader
         conversation={selectedConversation}
+        onOpenMandate={onOpenMandate}
         onResetChat={onResetChat}
       />
       {children}

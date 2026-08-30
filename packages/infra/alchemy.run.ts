@@ -17,7 +17,7 @@ export const server = Cloudflare.Worker("server", {
     flags: ["nodejs_compat"],
   },
   dev: {
-    port: 3000,
+    port: 3003,
   },
   env: {
     CORS_ORIGIN: Config.string("CORS_ORIGIN").pipe(Config.withDefault("*")),

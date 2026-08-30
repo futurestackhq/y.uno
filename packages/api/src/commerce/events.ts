@@ -24,6 +24,7 @@ type CommerceExecutionEventType =
   | "buy_missing_catalog_item"
   | "carousel_rendered"
   | "checkout_returned"
+  | "mandate_verified"
   | "order_drafted"
   | "payment_confirmed"
   | "quick_reply_received";

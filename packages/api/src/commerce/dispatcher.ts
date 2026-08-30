@@ -3,6 +3,7 @@ import { schema } from "@hackathon/db";
 import { and, desc, eq, isNull, lte, or } from "drizzle-orm";
 
 import { logEvent } from "./events";
+import { evaluatePurchaseMandate } from "./mandate";
 import { buildPlan, normalizePlanJson } from "./plan";
 import { buildTurnFailureMessage, completeTurnWithMessage } from "./turns";
 import { envelopeSchema, getInboundFollowUpText } from "./types";
@@ -238,6 +239,123 @@ const handleUserText = async (
   return { jobId, sessionId: session.id } as const;
 };
 
+const completeConfirmedOrder = async ({
+  db,
+  envelope,
+  item,
+  orderId,
+  session,
+  turnId,
+}: {
+  db: Db;
+  envelope: Extract<Envelope, { type: "quick_reply" }>;
+  item: typeof schema.connectionCatalogItems.$inferSelect;
+  orderId: string;
+  session: typeof schema.sessions.$inferSelect;
+  turnId: string;
+}) => {
+  const [mandate] = await db
+    .select()
+    .from(schema.purchaseMandates)
+    .where(eq(schema.purchaseMandates.userId, envelope.userId))
+    .orderBy(desc(schema.purchaseMandates.updatedAt))
+    .limit(1);
+  const mandateDecision = mandate
+    ? evaluatePurchaseMandate({
+        mandate,
+        merchantId: item.connectionId,
+        totalCents: item.priceCents,
+      })
+    : { approved: false as const, reason: "inactive" as const };
+
+  await logEvent(db, {
+    data: {
+      mandateId: mandate?.id ?? null,
+      merchantId: item.connectionId,
+      orderId,
+      reason: mandateDecision.approved ? null : mandateDecision.reason,
+      totalCents: item.priceCents,
+    },
+    eventType: "mandate_verified",
+    level: mandateDecision.approved ? "info" : "warn",
+    sessionId: session.id,
+    turnId,
+  });
+
+  if (!mandateDecision.approved) {
+    const reason = mandate ? mandateDecision.reason : "no_active_mandate";
+    await completeTurnWithMessage(db, {
+      content: {
+        mandateDecision: "denied",
+        orderId,
+        reason,
+        text: `Purchase blocked by your mandate: ${reason}. No payment was attempted.`,
+      },
+      outcome: "failed",
+      sessionId: session.id,
+      turnId,
+      type: "text",
+    });
+    return;
+  }
+
+  const [paymentMethod] = await db
+    .select({ id: schema.paymentMethods.id })
+    .from(schema.paymentMethods)
+    .where(
+      and(
+        eq(schema.paymentMethods.userId, envelope.userId),
+        eq(schema.paymentMethods.isDefault, true)
+      )
+    )
+    .orderBy(desc(schema.paymentMethods.createdAt))
+    .limit(1);
+
+  await db
+    .update(schema.orders)
+    .set({ mandateId: mandateDecision.mandateId, updatedAt: nowIso() })
+    .where(eq(schema.orders.id, orderId));
+
+  if (!paymentMethod) {
+    await completeTurnWithMessage(db, {
+      content: buildDirectCheckoutMessage(orderId),
+      outcome: "succeeded",
+      sessionId: session.id,
+      turnId,
+      type: "text",
+    });
+    return;
+  }
+
+  await db
+    .update(schema.orders)
+    .set({
+      paymentMethodId: paymentMethod.id,
+      status: "paid",
+      updatedAt: nowIso(),
+    })
+    .where(eq(schema.orders.id, orderId));
+  await logEvent(db, {
+    data: { mandateId: mandateDecision.mandateId, orderId },
+    eventType: "payment_confirmed",
+    level: "info",
+    sessionId: session.id,
+    turnId,
+  });
+  await completeTurnWithMessage(db, {
+    content: {
+      mandateDecision: "approved",
+      mandateId: mandateDecision.mandateId,
+      orderId,
+      text: "Payment completed with your saved card. Your purchase was authorized by an active mandate.",
+    },
+    outcome: "succeeded",
+    sessionId: session.id,
+    turnId,
+    type: "text",
+  });
+};
+
 const handleQuickReply = async (
   db: Db,
   envelope: Extract<Envelope, { type: "quick_reply" }>,
@@ -349,12 +467,13 @@ const handleQuickReply = async (
         }),
       ]);
       if (envelope.action === "confirm_order") {
-        await completeTurnWithMessage(db, {
-          content: buildDirectCheckoutMessage(orderId),
-          outcome: "succeeded",
-          sessionId: session.id,
+        await completeConfirmedOrder({
+          db,
+          envelope,
+          item,
+          orderId,
+          session,
           turnId: meta.turnId,
-          type: "text",
         });
         return;
       }
