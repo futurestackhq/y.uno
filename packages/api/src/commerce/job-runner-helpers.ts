@@ -9,14 +9,6 @@ interface CatalogItem {
   title: string;
 }
 
-export interface ClassifyIntentResult {
-  intent: string;
-  entities: {
-    terms: string[];
-  };
-  missing: string[];
-}
-
 export interface RankedItem {
   id: string;
   title: string;
@@ -58,27 +50,6 @@ const normalizeTerms = (text: string): string[] =>
     .replaceAll(/\p{Diacritic}/gu, "")
     .split(/[^a-z0-9]+/u)
     .filter((term) => term.length >= 3);
-
-export const classifyIntentFromText = (text: string): ClassifyIntentResult => {
-  const terms = normalizeTerms(text);
-  const termSet = new Set(terms);
-  const hasPetTerm = ["pet", "cachorro", "gato", "racao", "banho", "tosa"].some(
-    (term) => termSet.has(term)
-  );
-  const hasServiceTerm = ["banho", "tosa", "agenda", "agendar"].some((term) =>
-    termSet.has(term)
-  );
-
-  if (hasServiceTerm) {
-    return { entities: { terms }, intent: "service_pet_grooming", missing: [] };
-  }
-
-  if (hasPetTerm) {
-    return { entities: { terms }, intent: "product_pet_food", missing: [] };
-  }
-
-  return { entities: { terms }, intent: "generic_request", missing: [] };
-};
 
 const scoreCatalogItem = (item: CatalogItem, terms: Set<string>): number => {
   const haystack = normalizeTerms(

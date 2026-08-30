@@ -54,6 +54,8 @@ export const sessions = sqliteTable("sessions", {
       "done",
       "expired",
       "failed",
+      "planning",
+      "waiting_results",
     ],
   }).notNull(),
   updatedAt: text("updated_at").notNull().$defaultFn(now),

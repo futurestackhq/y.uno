@@ -1,25 +1,10 @@
 import { describe, expect, it } from "bun:test";
 
 import {
-  classifyIntentFromText,
   hasComposeReplyMarker,
   hasSourceJobId,
   rankCatalogItems,
 } from "./job-runner-helpers";
-
-describe("classifyIntentFromText", () => {
-  it("detects pet food intent from product text", () => {
-    expect(classifyIntentFromText("quero ração pro meu cachorro").intent).toBe(
-      "product_pet_food"
-    );
-  });
-
-  it("detects grooming service intent", () => {
-    expect(classifyIntentFromText("preciso agendar banho e tosa").intent).toBe(
-      "service_pet_grooming"
-    );
-  });
-});
 
 describe("rankCatalogItems", () => {
   it("prioritizes active matching catalog items", () => {

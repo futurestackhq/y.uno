@@ -11,7 +11,9 @@ export { canDelegatePlan } from "./reset";
 
 export interface PersistedHostPlan {
   baseRevision: number;
+  decision: HostPlanDecision;
   planId: string;
+  session: typeof schema.sessions.$inferSelect;
   sessionId: string;
   sessionRevision: number;
 }
@@ -22,6 +24,7 @@ export const persistHostPlan = async (
     decision: HostPlanDecision;
     envelope: Envelope;
     sessionId?: string;
+    sourceJob?: { id: string };
   }
 ): Promise<PersistedHostPlan> => {
   const decision = hostPlanDecisionSchema.parse(input.decision);
@@ -117,5 +120,20 @@ export const persistHostPlan = async (
     }),
   ]);
 
-  return { baseRevision: sessionRevision, planId, sessionId, sessionRevision };
+  const [session] = await db
+    .select()
+    .from(schema.sessions)
+    .where(eq(schema.sessions.id, sessionId))
+    .limit(1);
+  if (!session) {
+    throw new Error("Host session was not persisted");
+  }
+  return {
+    baseRevision: sessionRevision,
+    decision,
+    planId,
+    session,
+    sessionId,
+    sessionRevision,
+  };
 };

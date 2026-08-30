@@ -23,11 +23,7 @@ export interface SessionPlan {
 
 const nowIso = () => new Date().toISOString();
 
-const PLAN_NODE_IDS = [
-  "classify_intent",
-  "rank_catalog",
-  "compose_reply",
-] as const;
+const PLAN_NODE_IDS = ["host_plan", "rank_catalog", "compose_reply"] as const;
 
 const isPlanNodeStatus = (value: unknown): value is PlanNodeStatus =>
   value === "pending" ||
@@ -60,12 +56,12 @@ export const buildPlan = (intent: string): SessionPlan => {
   const nodes: PlanNode[] = [
     {
       deps: [],
-      id: "classify_intent",
-      kind: "classify_intent",
+      id: "host_plan",
+      kind: "host_plan",
       status: "ready",
     },
     {
-      deps: ["classify_intent"],
+      deps: ["host_plan"],
       id: "rank_catalog",
       kind: "rank_catalog",
       status: intent === "generic_request" ? "blocked" : "pending",

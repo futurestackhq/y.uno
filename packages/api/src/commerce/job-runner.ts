@@ -3,8 +3,10 @@ import { schema } from "@hackathon/db";
 import { and, asc, eq, isNull, lte, or } from "drizzle-orm";
 
 import { logEvent, logProgressLine } from "./events";
+import { runHostPlan } from "./host-agent";
+import { assembleHostContext } from "./host-context";
+import { persistHostPlan } from "./host-persistence";
 import {
-  classifyIntentFromText,
   hasComposeReplyMarker,
   hasSourceJobId,
   rankCatalogItems,
@@ -13,6 +15,7 @@ import type { RankedItem } from "./job-runner-helpers";
 import type { PlanNodeStatus } from "./plan";
 import { normalizePlanJson } from "./plan";
 import { buildDelegationPrompt } from "./prompts";
+import type { Envelope } from "./types";
 
 const LEASE_MS = 60_000;
 const MAX_ATTEMPTS = 3;
@@ -20,12 +23,6 @@ const BACKOFF_MS = [2000, 5000, 12_000] as const;
 
 type JobRow = typeof schema.jobs.$inferSelect;
 type SessionRow = typeof schema.sessions.$inferSelect;
-
-interface ClassifyIntentInput {
-  sessionId: string;
-  text: string;
-  userId: string;
-}
 
 interface RankCatalogInput {
   sessionId: string;
@@ -124,7 +121,13 @@ const enqueueJob = async (
   db: Db,
   params: {
     input: unknown;
-    kind: "rank_catalog" | "compose_reply";
+    kind:
+      | "rank_catalog"
+      | "compose_reply"
+      | "catalog_search"
+      | "catalog_details"
+      | "create_order"
+      | "prepare_checkout";
     session: SessionRow;
     sourceJobId: string;
     subagentName: string;
@@ -428,68 +431,83 @@ const failJob = async (db: Db, job: JobRow, error: unknown) => {
   });
 };
 
-const runClassifyIntent = async (db: Db, job: JobRow) => {
-  const input = parseJson<ClassifyIntentInput>(job.inputJson);
-  await logProgressLine(db, {
-    jobId: job.id,
-    line: "Classifying customer intent from latest message.",
+const writeAssistantMessage = async (
+  db: Db,
+  sessionId: string,
+  userId: string,
+  content: unknown
+) => {
+  await db.insert(schema.messages).values({
+    contentJson: JSON.stringify(content),
+    createdAt: nowIso(),
+    id: crypto.randomUUID(),
+    role: "assistant",
+    sessionId,
+    type: "text",
+    userId,
+  });
+};
+
+const materializeReadyPlanNodes = async (
+  db: Db,
+  planId: string,
+  session: SessionRow,
+  decision: Awaited<ReturnType<typeof runHostPlan>>
+) => {
+  await Promise.all(
+    decision.plan.nodes
+      .filter((node) => node.dependsOn.length === 0)
+      .map((node) =>
+        enqueueJob(db, {
+          input: { ...node.input, objective: node.objective, planId },
+          kind: node.kind,
+          session,
+          sourceJobId: planId,
+          subagentName: `host-${node.kind}`,
+        })
+      )
+  );
+};
+
+const runHostPlanJob = async (db: Db, job: JobRow) => {
+  const input = parseJson<{ envelope: Envelope }>(job.inputJson);
+  const snapshot = await assembleHostContext(db, { envelope: input.envelope });
+  const decision = await runHostPlan({
+    db,
+    envelope: input.envelope,
+    snapshot,
+  });
+  const persisted = await persistHostPlan(db, {
+    decision,
+    envelope: input.envelope,
     sessionId: job.sessionId,
+    sourceJob: job,
   });
-
-  const result = classifyIntentFromText(input.text);
-  const session = await getSession(db, job.sessionId);
-  const ts = nowIso();
-  const nextPlan = updatePlanNode(session.planJson, {
-    intent: session.intent,
-    jobId: job.id,
-    nodeId: "classify_intent",
-    now: ts,
-    status: "done",
-  });
-
-  await db
-    .update(schema.sessions)
-    .set({
-      intent: result.intent,
-      planJson: nextPlan,
-      status: result.intent === "generic_request" ? "awaiting_user" : "active",
-      updatedAt: ts,
-    })
-    .where(eq(schema.sessions.id, job.sessionId));
-
-  await completeJob(db, job, result, {});
-
-  await logEvent(db, {
-    data: result,
-    eventType: "intent_detected",
-    jobId: job.id,
-    level: "info",
-    sessionId: job.sessionId,
-  });
-
-  if (result.intent === "generic_request") {
-    await db.insert(schema.messages).values({
-      contentJson: JSON.stringify({
-        text: "Entendi. Me conta o que você quer comprar ou agendar para eu buscar opções.",
-      }),
-      createdAt: nowIso(),
-      id: crypto.randomUUID(),
-      role: "assistant",
-      sessionId: job.sessionId,
-      type: "text",
-      userId: input.userId,
-    });
+  await completeJob(
+    db,
+    job,
+    { planId: persisted.planId },
+    { session: persisted.session }
+  );
+  if (decision.conversation.state === "needs_clarification") {
+    if (decision.userMessage) {
+      await writeAssistantMessage(
+        db,
+        persisted.session.id,
+        input.envelope.userId,
+        {
+          text: decision.userMessage,
+        }
+      );
+    }
     return;
   }
-
-  const updatedSession = await getSession(db, job.sessionId);
-  await enqueueJob(db, {
-    input: { ...input, intent: result.intent },
-    kind: "rank_catalog",
-    session: updatedSession,
-    sourceJobId: job.id,
-    subagentName: "catalog-ranker",
-  });
+  await materializeReadyPlanNodes(
+    db,
+    persisted.planId,
+    persisted.session,
+    decision
+  );
 };
 
 const runRankCatalog = async (db: Db, job: JobRow) => {
@@ -567,8 +585,8 @@ const runJob = async (db: Db, job: JobRow) => {
   });
 
   try {
-    if (job.kind === "classify_intent") {
-      await runClassifyIntent(db, job);
+    if (job.kind === "host_plan") {
+      await runHostPlanJob(db, job);
     } else if (job.kind === "rank_catalog") {
       await runRankCatalog(db, job);
     } else if (job.kind === "compose_reply") {

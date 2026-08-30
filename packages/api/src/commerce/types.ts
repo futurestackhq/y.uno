@@ -7,8 +7,20 @@ export const sessionStatusSchema = z.enum([
   "done",
   "expired",
   "failed",
+  "planning",
+  "waiting_results",
 ]);
 export type SessionStatus = z.infer<typeof sessionStatusSchema>;
+
+export const hostJobKindSchema = z.enum([
+  "host_plan",
+  "host_synthesis",
+  "catalog_search",
+  "catalog_details",
+  "create_order",
+  "prepare_checkout",
+]);
+export type HostJobKind = z.infer<typeof hostJobKindSchema>;
 
 export const quickReplyActionSchema = z.enum([
   "details",

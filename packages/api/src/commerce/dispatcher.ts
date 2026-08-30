@@ -3,31 +3,11 @@ import { schema } from "@hackathon/db";
 import { and, desc, eq } from "drizzle-orm";
 
 import { logEvent } from "./events";
-import type { PlanNodeStatus } from "./plan";
 import { buildPlan, normalizePlanJson } from "./plan";
-import { buildDelegationPrompt } from "./prompts";
-import { isSmallTalk } from "./small-talk";
 import { envelopeSchema } from "./types";
 import type { Envelope } from "./types";
 
 const nowIso = () => new Date().toISOString();
-
-const markPlanNodeQueued = (
-  planJson: string,
-  params: { intent: string; jobId: string; nodeId: string; now: string }
-): string => {
-  const plan = normalizePlanJson(planJson, params.intent);
-  const status: PlanNodeStatus = "ready";
-  return JSON.stringify({
-    ...plan,
-    nodes: plan.nodes.map((node) =>
-      node.id === params.nodeId
-        ? { ...node, jobId: params.jobId, status }
-        : node
-    ),
-    updatedAt: params.now,
-  });
-};
 
 const addMessage = async (
   db: Db,
@@ -84,6 +64,10 @@ const ensureSession = async (
   const existing = params.requestedSessionId
     ? await getSessionById(db, params.requestedSessionId)
     : await getLatestSession(db, params.userId);
+
+  if (existing && existing.userId !== params.userId) {
+    throw new Error("Session does not belong to envelope user");
+  }
 
   if (existing) {
     const normalizedPlan = normalizePlanJson(
@@ -146,17 +130,13 @@ const handleUserText = async (
   envelope: Extract<Envelope, { type: "user_text" }>,
   meta: { messageQueueId: string }
 ) => {
-  const text = envelope.text.trim();
-  const session =
-    (await ensureSession(db, {
-      requestedSessionId: envelope.sessionId,
-      userId: envelope.userId,
-    })) ??
-    // If something went wrong when creating the session, fall back to a stable id for logs.
-    ({
-      id: envelope.sessionId ?? crypto.randomUUID(),
-      intent: "unknown",
-    } as const);
+  const session = await ensureSession(db, {
+    requestedSessionId: envelope.sessionId,
+    userId: envelope.userId,
+  });
+  if (!session) {
+    throw new Error("Failed to create commerce session");
+  }
 
   await logEvent(db, {
     data: {
@@ -177,27 +157,9 @@ const handleUserText = async (
     userId: envelope.userId,
   });
 
-  if (isSmallTalk(text)) {
-    await addMessage(db, {
-      content: {
-        text: "Oi! Posso te ajudar a comprar ou agendar algo. O que você precisa?",
-      },
-      role: "assistant",
-      sessionId: session.id,
-      type: "text",
-      userId: envelope.userId,
-    });
-
-    return { sessionId: session.id } as const;
-  }
-
   const jobId = crypto.randomUUID();
-  const input = { sessionId: session.id, text, userId: envelope.userId };
-  const promptText = buildDelegationPrompt({
-    input,
-    kind: "classify_intent",
-    session: { id: session.id, intent: session.intent },
-  });
+  const input = { envelope, messageQueueId: meta.messageQueueId };
+  const timestamp = nowIso();
 
   await db.insert(schema.jobs).values({
     attempts: 0,
@@ -206,45 +168,20 @@ const handleUserText = async (
     finishedAt: null,
     id: jobId,
     inputJson: JSON.stringify(input),
-    kind: "classify_intent",
+    kind: "host_plan",
     leaseExpiresAt: null,
-    nextRunAt: nowIso(),
-    promptText,
+    nextRunAt: timestamp,
+    promptText: null,
     resultJson: null,
     sessionId: session.id,
     startedAt: null,
     status: "queued",
-    subagentName: "intent-classifier",
+    subagentName: "conversational-host",
     updatedAt: nowIso(),
   });
 
-  const planUpdatedAt = nowIso();
-  await db
-    .update(schema.sessions)
-    .set({
-      planJson: markPlanNodeQueued(session.planJson, {
-        intent: session.intent,
-        jobId,
-        nodeId: "classify_intent",
-        now: planUpdatedAt,
-      }),
-      updatedAt: planUpdatedAt,
-    })
-    .where(eq(schema.sessions.id, session.id));
-
   await logEvent(db, {
-    data: { jobId, nodeId: "classify_intent" },
-    eventType: "plan_updated",
-    jobId,
-    level: "info",
-    sessionId: session.id,
-  });
-
-  await logEvent(db, {
-    data: {
-      jobKind: "classify_intent",
-      promptPreview: promptText.slice(0, 240),
-    },
+    data: { jobKind: "host_plan" },
     eventType: "delegation_created",
     jobId,
     level: "info",
@@ -252,7 +189,7 @@ const handleUserText = async (
   });
 
   await logEvent(db, {
-    data: { jobKind: "classify_intent" },
+    data: { jobKind: "host_plan" },
     eventType: "job_queued",
     jobId,
     level: "info",
