@@ -1,18 +1,29 @@
-type SessionLite = { id: string; intent: string };
+interface SessionLite {
+  id: string;
+  intent: string;
+}
 
-type DelegationPromptParams = {
+interface DelegationPromptParams {
   kind: string;
   input: unknown;
   session: SessionLite;
-};
+}
 
 const compareStringKeys = (a: string, b: string): number => {
-  if (a < b) return -1;
-  if (a > b) return 1;
+  if (a < b) {
+    return -1;
+  }
+  if (a > b) {
+    return 1;
+  }
   return 0;
 };
 
-const isPlainObject = (value: object): value is Record<string, unknown> => {
+const isPlainObject = (value: unknown): value is Record<string, unknown> => {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+
   const proto = Object.getPrototypeOf(value);
   return proto === Object.prototype || proto === null;
 };
@@ -21,10 +32,14 @@ const normalizeJsonValue = (
   value: unknown,
   stack: WeakSet<object>
 ): unknown => {
-  if (value === null) return null;
+  if (value === null) {
+    return null;
+  }
 
   const t = typeof value;
-  if (t === "string" || t === "number" || t === "boolean") return value;
+  if (t === "string" || t === "number" || t === "boolean") {
+    return value;
+  }
 
   // Only JSON-serializable values are supported; everything else becomes null.
   if (
@@ -36,22 +51,30 @@ const normalizeJsonValue = (
     return null;
   }
 
-  if (t !== "object") return null;
+  if (t !== "object") {
+    return null;
+  }
 
   if (Array.isArray(value)) {
-    if (stack.has(value)) return "[Circular]";
+    if (stack.has(value)) {
+      return "[Circular]";
+    }
     stack.add(value);
     const out = value.map((item) => normalizeJsonValue(item, stack));
     stack.delete(value);
     return out;
   }
 
-  if (!isPlainObject(value)) return null;
+  if (!isPlainObject(value)) {
+    return null;
+  }
 
-  if (stack.has(value)) return "[Circular]";
+  if (stack.has(value)) {
+    return "[Circular]";
+  }
   stack.add(value);
 
-  const keys = Object.keys(value).sort(compareStringKeys);
+  const keys = Object.keys(value).toSorted(compareStringKeys);
   const out: Record<string, unknown> = {};
   for (const key of keys) {
     out[key] = normalizeJsonValue(value[key], stack);
@@ -67,12 +90,46 @@ const stableJsonStringify = (value: unknown): string => {
 };
 
 const outputContractJson = stableJsonStringify({
-  summary: "short summary string",
   artifacts: [],
-  warnings: [],
-  toolCalls: [],
   next: null,
+  summary: "short summary string",
+  toolCalls: [],
+  warnings: [],
 });
+
+interface HostPromptParams {
+  context: unknown;
+}
+
+const hostPlanningInstructions = [
+  "You are the conversational host for a commerce orchestration system.",
+  "Interpret natural language using the supplied conversation and session context.",
+  "Return only the configured structured output.",
+  "Resolve references only when grounded in the supplied context.",
+  "Choose needs_clarification when context cannot safely determine a useful action.",
+  "Never expose private reasoning; decisionSummary must be a concise user-safe operational rationale.",
+  "Do not execute commerce effects. Propose plan nodes only.",
+].join("\n");
+
+export const buildHostPlanningPrompt = (params: HostPromptParams): string =>
+  [
+    hostPlanningInstructions,
+    "",
+    "Conversation and session context:",
+    stableJsonStringify(params.context),
+  ].join("\n");
+
+export const buildHostSynthesisPrompt = (params: HostPromptParams): string =>
+  [
+    "You are the conversational host presenting the result of a commerce orchestration system.",
+    "Use only the supplied conversation, session, plan, and delegation context.",
+    "Return only the configured structured output.",
+    "Write a concise, user-facing assistant message.",
+    "Never expose private reasoning or internal operational details.",
+    "",
+    "Synthesis context:",
+    stableJsonStringify(params.context),
+  ].join("\n");
 
 export const buildDelegationPrompt = (
   params: DelegationPromptParams
