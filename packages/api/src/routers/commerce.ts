@@ -87,37 +87,56 @@ export const commerceRouter = router({
             )
           )
           .groupBy(schema.jobs.status),
-        ctx.db
-          .select({
-            count: sql<number>`count(*)`,
-            status: schema.messageQueue.status,
-          })
-          .from(schema.messageQueue)
-          .where(
-            and(
-              inArray(schema.messageQueue.status, activeMessageQueueStatuses),
-              input?.userId
-                ? eq(schema.messageQueue.userId, input.userId)
-                : sql`1=1`
+        (async () => {
+          let queueUserId = input?.userId;
+          if (!queueUserId && input?.sessionId) {
+            const [session] = await ctx.db
+              .select({ userId: schema.sessions.userId })
+              .from(schema.sessions)
+              .where(eq(schema.sessions.id, input.sessionId))
+              .limit(1);
+            queueUserId = session?.userId;
+          }
+
+          return await ctx.db
+            .select({
+              count: sql<number>`count(*)`,
+              status: schema.messageQueue.status,
+            })
+            .from(schema.messageQueue)
+            .where(
+              and(
+                inArray(schema.messageQueue.status, activeMessageQueueStatuses),
+                queueUserId
+                  ? eq(schema.messageQueue.userId, queueUserId)
+                  : sql`1=1`
+              )
             )
-          )
-          .groupBy(schema.messageQueue.status),
+            .groupBy(schema.messageQueue.status);
+        })(),
       ]);
 
-      const jobs = {
+      const jobs: Record<(typeof activeJobStatuses)[number], number> = {
         queued: 0,
         running: 0,
       };
       for (const row of jobCounts) {
-        jobs[row.status] = row.count;
+        if (row.status === "queued" || row.status === "running") {
+          jobs[row.status] = row.count;
+        }
       }
 
-      const messageQueue = {
+      const messageQueue: Record<
+        (typeof activeMessageQueueStatuses)[number],
+        number
+      > = {
         pending: 0,
         processing: 0,
       };
       for (const row of messageQueueCounts) {
-        messageQueue[row.status] = row.count;
+        if (row.status === "pending" || row.status === "processing") {
+          messageQueue[row.status] = row.count;
+        }
       }
 
       return {
@@ -177,6 +196,7 @@ export const commerceRouter = router({
         jobCounts,
         jobs: jobs.map((job) => ({
           ...job,
+          error: job.errorText,
           input: parseJsonOrRaw(job.inputJson),
           result: parseJsonOrRaw(job.resultJson),
         })),
