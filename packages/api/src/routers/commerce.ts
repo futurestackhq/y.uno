@@ -1,5 +1,5 @@
 import { schema } from "@hackathon/db";
-import { and, asc, eq, inArray, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
 import { z } from "zod";
 
 import {
@@ -41,6 +41,27 @@ const parseJsonOrRaw = (value: string | null): unknown => {
     return value;
   }
 };
+
+export const serializeCurrentHostPlan = (
+  plan:
+    | {
+        baseRevision: number;
+        decisionJson: string;
+        decisionSummary: string;
+        id: string;
+        status: string;
+      }
+    | undefined
+) =>
+  plan
+    ? {
+        baseRevision: plan.baseRevision,
+        decision: parseJsonOrRaw(plan.decisionJson),
+        decisionSummary: plan.decisionSummary,
+        id: plan.id,
+        status: plan.status,
+      }
+    : null;
 
 export const commerceRouter = router({
   getJobLogs: publicProcedure
@@ -182,6 +203,22 @@ export const commerceRouter = router({
         .from(schema.jobs)
         .where(eq(schema.jobs.sessionId, input.sessionId))
         .orderBy(asc(schema.jobs.createdAt), asc(schema.jobs.id));
+      const [latestPlan] = await ctx.db
+        .select({
+          baseRevision: schema.hostPlans.baseRevision,
+          decisionJson: schema.hostPlans.decisionJson,
+          decisionSummary: schema.hostPlans.decisionSummary,
+          id: schema.hostPlans.id,
+          status: schema.hostPlans.status,
+        })
+        .from(schema.hostPlans)
+        .where(eq(schema.hostPlans.sessionId, input.sessionId))
+        .orderBy(
+          desc(schema.hostPlans.baseRevision),
+          desc(schema.hostPlans.createdAt),
+          desc(schema.hostPlans.id)
+        )
+        .limit(1);
 
       const jobCounts = {
         done: 0,
@@ -194,6 +231,7 @@ export const commerceRouter = router({
       }
 
       return {
+        currentHostPlan: serializeCurrentHostPlan(latestPlan),
         jobCounts,
         jobs: jobs.map((job) => ({
           ...job,

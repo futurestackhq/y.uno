@@ -110,6 +110,7 @@ const CommercePage = () => {
       await sendEnvelopeMutation.mutateAsync({
         sessionId: envelope.payload.sessionId,
         text: envelope.payload.text,
+        idempotencyKey: envelope.payload.idempotencyKey,
         type: "user_text",
         userId: "user_marta",
       });
@@ -159,7 +160,6 @@ const CommercePage = () => {
             <CardContent className="min-h-0 flex-1 px-0">
               <ChatPanel
                 messages={messagesQuery.data ?? []}
-                isSending={sendEnvelopeMutation.isPending}
                 isWorking={isWorking}
                 onOpenCheckout={(orderId, sessionId) => {
                   setCheckoutSessionId(sessionId);
@@ -184,6 +184,7 @@ const CommercePage = () => {
                 sessions={(sessionsQuery.data ?? []).map((s) => ({
                   id: s.id,
                   intent: s.intent,
+                  revision: s.revision,
                   status: s.status,
                   updatedAt: s.updatedAt,
                 }))}
