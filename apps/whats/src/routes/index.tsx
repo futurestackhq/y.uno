@@ -113,7 +113,7 @@ const WhatsPlaceholder = () => {
             action === "pay_now" ||
             action === "confirm_payment" ||
             action === "confirm" ||
-            action === "Confirmar compra";
+            action === "Confirm purchase";
           const normalizedOrderId = orderId?.trim();
           if (isCheckoutAction && normalizedOrderId) {
             openCheckout(normalizedOrderId);

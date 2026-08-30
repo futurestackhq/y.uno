@@ -38,7 +38,7 @@ export const WhatsCheckoutPanel = ({
       });
       if (!order || order.status !== "draft") {
         setIsOrderPayable(false);
-        setError("Este pedido já foi processado.");
+        setError("This order has already been processed.");
         return;
       }
       setIsOrderPayable(true);
@@ -90,7 +90,7 @@ export const WhatsCheckoutPanel = ({
       await onComplete(orderId, paymentMethod);
       onClose();
     } catch {
-      setError("Não foi possível processar o pagamento.");
+      setError("Unable to process the payment.");
       setIsPaying(false);
       return;
     }
@@ -100,7 +100,7 @@ export const WhatsCheckoutPanel = ({
   if (isOrderPayable === null || isLoadingPaymentMethod) {
     return (
       <aside className="flex w-76 shrink-0 items-center justify-center border-l border-[#d9dee2] bg-white p-4 text-sm text-[#667781]">
-        Preparando pagamento seguro…
+        Preparing secure payment…
       </aside>
     );
   }
@@ -129,7 +129,7 @@ export const WhatsCheckoutPanel = ({
                 Pagamento seguro
               </p>
               <p className="text-xs text-[#667781]">
-                Cartão {paymentMethod?.brand.toUpperCase()} ••••{" "}
+                Card {paymentMethod?.brand.toUpperCase()} ••••{" "}
                 {paymentMethod?.last4}
               </p>
             </div>
@@ -140,7 +140,7 @@ export const WhatsCheckoutPanel = ({
           <strong className="text-[#111b21]">{total ?? "Carregando…"}</strong>
         </div>
         <p className="text-xs leading-4 text-[#667781]">
-          Ao confirmar, o pagamento será processado pelo commerce demo.
+          When confirmed, payment will be processed by the commerce demo.
         </p>
         {error ? <p className="text-xs text-[#c0392b]">{error}</p> : null}
       </div>
@@ -152,7 +152,7 @@ export const WhatsCheckoutPanel = ({
           type="button"
         >
           <Check size={16} />
-          {isPaying ? "Processando…" : "Confirmar pagamento"}
+          {isPaying ? "Processing…" : "Confirm payment"}
         </button>
       </footer>
     </aside>

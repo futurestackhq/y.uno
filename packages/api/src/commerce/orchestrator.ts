@@ -62,7 +62,7 @@ export const enqueueEnvelope = async (db: Db, envelope: Envelope) => {
   if (envelope.type === "user_text") {
     summary = envelope.text;
   } else if (envelope.type === "quick_reply") {
-    summary = `Ação selecionada: ${envelope.action}`;
+    summary = `Selected action: ${envelope.action}`;
   } else {
     summary = `Retorno do checkout: ${envelope.status}`;
   }

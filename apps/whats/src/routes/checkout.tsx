@@ -104,18 +104,18 @@ const PaymentPage = () => {
         <div className="mt-10 grid overflow-hidden rounded-xl border border-[#dedcff] bg-white shadow-[0_16px_48px_rgba(57,48,147,0.16)] lg:grid-cols-[1.15fr_0.85fr]">
           <section className="p-7 lg:p-10">
             <p className="text-xs font-semibold tracking-[0.12em] text-[#625ed1] uppercase">
-              Dados do pagamento
+              Payment details
             </p>
             <h1 className="mt-2 text-2xl font-semibold tracking-[-0.03em]">
-              Pagamento com cartão
+              Card payment
             </h1>
             <p className="mt-2 max-w-105 text-sm leading-5 text-[#6d6983]">
-              Seus dados são coletados nesta página segura e o WhatsApp recebe
-              apenas a confirmação da transação.
+              Your details are collected on this secure page, and WhatsApp
+              receives only the transaction confirmation.
             </p>
             <form className="mt-8 space-y-5" onSubmit={handleSubmit}>
               <label className="block text-sm font-medium">
-                Número do cartão
+                Card number
                 <input
                   autoComplete="cc-number"
                   className="mt-1.5 h-12 w-full rounded-lg border border-[#d9d7f2] px-3 text-base transition outline-none focus:border-[#5b58df] focus:ring-2 focus:ring-[#5b58df33]"
@@ -126,13 +126,13 @@ const PaymentPage = () => {
                 />
               </label>
               <label className="block text-sm font-medium">
-                Nome no cartão
+                Name on card
                 <input
                   autoComplete="cc-name"
                   className="mt-1.5 h-12 w-full rounded-lg border border-[#d9d7f2] px-3 text-base transition outline-none focus:border-[#5b58df] focus:ring-2 focus:ring-[#5b58df33]"
                   disabled={isCardAutofilled}
                   onChange={handleCardFieldChange}
-                  placeholder="Como escrito no cartão"
+                  placeholder="As shown on card"
                   value={cardholderName}
                 />
               </label>
@@ -166,13 +166,13 @@ const PaymentPage = () => {
                 disabled={isSubmitting}
                 type="submit"
               >
-                {isSubmitting ? "Processando pagamento…" : "Pagar agora"}
+                {isSubmitting ? "Processing payment…" : "Pay now"}
               </button>
             </form>
           </section>
           <aside className="border-t border-[#dedcff] bg-[#f9f8ff] p-7 lg:border-t-0 lg:border-l lg:p-10">
             <p className="text-xs font-semibold tracking-[0.12em] text-[#625ed1] uppercase">
-              Resumo do pedido
+              Order summary
             </p>
             <div className="mt-6 border-b border-[#dedcff] pb-6">
               <p className="text-base font-semibold">
@@ -188,10 +188,8 @@ const PaymentPage = () => {
                 <dd className="font-medium text-[#25213d]">Marta</dd>
               </div>
               <div className="flex justify-between text-[#6d6983]">
-                <dt>Forma de pagamento</dt>
-                <dd className="font-medium text-[#25213d]">
-                  Cartão de crédito
-                </dd>
+                <dt>Payment method</dt>
+                <dd className="font-medium text-[#25213d]">Credit card</dd>
               </div>
               <div className="flex justify-between border-t border-[#dedcff] pt-4 text-base font-semibold text-[#25213d]">
                 <dt>Total</dt>
@@ -203,12 +201,11 @@ const PaymentPage = () => {
                 className="mt-0.5 shrink-0 text-[#5b58df]"
                 size={15}
               />
-              Dados protegidos com tokenização. Seu cartão não é enviado ao
-              WhatsApp.
+              Data protected by tokenization. Your card is not sent to WhatsApp.
             </div>
             <div className="mt-5 flex items-center gap-2 text-xs font-medium text-[#45417a]">
               <CheckCircle2 size={16} />
-              Cartão salvo para próximas compras
+              Save card for future purchases
             </div>
           </aside>
         </div>

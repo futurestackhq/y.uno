@@ -88,7 +88,7 @@ export const DelegationsAccordion = (props: { jobs: DelegationJob[] }) => {
       <TaskContent className="border-t px-2 pb-2">
         {sortedJobs.length === 0 ? (
           <div className="text-muted-foreground px-1 py-4 text-xs">
-            Nenhuma delegação ainda.
+            No delegations yet.
           </div>
         ) : (
           sortedJobs.map((job) => (

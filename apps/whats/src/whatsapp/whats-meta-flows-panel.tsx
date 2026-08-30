@@ -21,7 +21,7 @@ export const WhatsMetaFlowsPanel = ({ onClose }: WhatsMetaFlowsPanelProps) => (
     <div className="flex-1 px-4 pt-5">
       <h3 className="text-[17px] font-semibold">Adedayo Diana Costa Sanni</h3>
       <p className="mt-3 text-[13px] text-[#3b4a54]">💰 R$ 1,00</p>
-      <p className="mt-3 text-[13px] text-[#3b4a54]">📅 29/08 às 13h24</p>
+      <p className="mt-3 text-[13px] text-[#3b4a54]">📅 08/29 at 1:24 PM</p>
       <p className="mt-3 text-[13px] text-[#3b4a54]">💸 Pix</p>
 
       <button
@@ -34,8 +34,8 @@ export const WhatsMetaFlowsPanel = ({ onClose }: WhatsMetaFlowsPanelProps) => (
       <label className="mt-4 flex gap-2 text-[11px] leading-4 text-[#667781]">
         <input className="mt-0.5 accent-[#20b15a]" type="checkbox" />
         <span>
-          (Opcional) Manter categoria para próximas transações para Adedayo
-          Diana Costa Sanni
+          (Optional) Keep category for Adedayo’s future transactions Diana Costa
+          Sanni
         </span>
       </label>
     </div>
@@ -45,7 +45,7 @@ export const WhatsMetaFlowsPanel = ({ onClose }: WhatsMetaFlowsPanelProps) => (
         className="flex h-9 w-full items-center justify-center gap-2 rounded-full bg-[#20b15a] text-[13px] font-medium text-white hover:bg-[#159447]"
         type="button"
       >
-        Próximo
+        Next
         <Check size={15} />
       </button>
       <p className="text-center text-[10px] text-[#667781]">

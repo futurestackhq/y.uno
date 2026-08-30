@@ -11,7 +11,7 @@ describe("buildHostPlanningPrompt", () => {
     const prompt = buildHostPlanningPrompt({ context: {} });
 
     expect(prompt).toContain("respond_directly");
-    expect(prompt).toContain("Olá! O que você procura hoje?");
+    expect(prompt).toContain("Hello! What are you looking for today?");
     expect(prompt).toContain(
       "marketplace of stores offering products or services"
     );
@@ -24,7 +24,7 @@ describe("buildHostPlanningPrompt", () => {
 describe("buildDelegationPrompt", () => {
   it("includes stable header and expected output contract", () => {
     const prompt = buildDelegationPrompt({
-      input: { text: "quero ração" },
+      input: { text: "I want pet food" },
       kind: "classify_intent",
       session: { id: "sess_1", intent: "unknown" },
     });
@@ -39,7 +39,7 @@ describe("buildDelegationPrompt", () => {
     expect(prompt).toContain('"warnings": []');
     expect(prompt).toContain('"toolCalls": []');
     expect(prompt).toContain('"next": null');
-    expect(prompt).toContain('"text": "quero ração"');
+    expect(prompt).toContain('"text": "I want pet food"');
   });
 
   it("is deterministic for object key ordering", () => {
@@ -90,7 +90,7 @@ describe("buildHostSynthesisPrompt", () => {
   it("requires details and purchase actions for carousel cards", () => {
     const prompt = buildHostSynthesisPrompt({ context: {} });
 
-    expect(prompt).toContain('"details", label: "Ver detalhes"');
-    expect(prompt).toContain('"buy", label: "Comprar"');
+    expect(prompt).toContain('"details", label: "View details"');
+    expect(prompt).toContain('"buy", label: "Buy"');
   });
 });

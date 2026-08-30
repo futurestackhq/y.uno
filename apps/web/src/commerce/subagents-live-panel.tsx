@@ -100,7 +100,7 @@ export const SubagentsLivePanel = (props: {
           </div>
         ) : (
           <div className="text-muted-foreground rounded border px-3 py-6 text-center text-xs">
-            Nenhum subagent em execução ainda.
+            No subagents are running yet.
           </div>
         )}
       </div>

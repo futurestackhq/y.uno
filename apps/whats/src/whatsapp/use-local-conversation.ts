@@ -53,7 +53,7 @@ export const getProductDetailMessage = (
   createdAt: string,
   isOrderStarted = false
 ): Extract<WhatsMessage, { kind: "product_detail" }> => ({
-  actionLabel: "Confirmar pedido",
+  actionLabel: "Confirm order",
   catalogItemId: getValue(content, "catalogItemId"),
   description:
     getValue(content, "subtitle") || getValue(content, "description"),
@@ -71,11 +71,11 @@ export const getProductDetailMessage = (
 
 const getQuickReplyText = (quickReply: string) =>
   ({
-    buy: "Comprar este item",
-    confirm_payment: "Confirmar compra",
-    details: "Ver detalhes do item",
-    pay_now: "Pagar agora",
-    swap_card: "Trocar cartão",
+    buy: "Buy este item",
+    confirm_payment: "Confirm purchase",
+    details: "View details do item",
+    pay_now: "Pay now",
+    swap_card: "Change card",
   })[quickReply] ?? quickReply;
 
 // oxlint-disable-next-line complexity
@@ -104,7 +104,7 @@ const getRemoteMessage = (
         hour: "2-digit",
         minute: "2-digit",
       }),
-      title: "Confirmar",
+      title: "Confirm",
     };
   }
 
@@ -136,9 +136,9 @@ const getRemoteMessage = (
       }
       return [
         {
-          actionLabel: ctas[0] ?? "Ver detalhes",
+          actionLabel: ctas[0] ?? "View details",
           description: getValue(card, "subtitle") || getValue(card, "merchant"),
-          eyebrow: getValue(card, "merchant") || "Opção",
+          eyebrow: getValue(card, "merchant") || "Option",
           id: getValue(card, "id") || `remote-card-${index}`,
           price: getValue(card, "price"),
           title,
@@ -162,7 +162,7 @@ const getRemoteMessage = (
           hour: "2-digit",
           minute: "2-digit",
         }),
-        title: getValue(content, "title") || "Opções para você:",
+        title: getValue(content, "title") || "Options for you:",
       };
     }
   }
@@ -188,7 +188,7 @@ const getRemoteMessage = (
           hour: "2-digit",
           minute: "2-digit",
         }),
-        title: getValue(content, "title") || "Resumo do pedido",
+        title: getValue(content, "title") || "Order summary",
         total: getValue(content, "total"),
       };
     }
@@ -387,7 +387,7 @@ export const useLocalConversation = () => {
           kind: "text",
           state: "read",
           text: normalizedText,
-          time: "agora",
+          time: "now",
         },
       ]);
       setIsSubmitting(true);
@@ -422,7 +422,7 @@ export const useLocalConversation = () => {
         setIsSubmitting(false);
         return;
       } catch {
-        setError("Não foi possível conectar ao commerce.");
+        setError("Unable to connect to commerce.");
       }
       setIsSubmitting(false);
     },
@@ -501,7 +501,7 @@ export const useLocalConversation = () => {
             )
           );
         }
-        setError("Não foi possível confirmar o pedido.");
+        setError("Unable to confirm the order.");
       }
     },
     [applyRemoteMessages, orderStartedSourceMessageIds, sessionId]
@@ -519,7 +519,7 @@ export const useLocalConversation = () => {
       setOrderStartedSourceMessageIds(new Set());
       checkoutMessageIdsRef.current.clear();
     } catch {
-      setError("Não foi possível resetar o demo.");
+      setError("Unable to reset the demo.");
     }
   }, []);
 

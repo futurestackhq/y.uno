@@ -74,7 +74,7 @@ const buildReply = (input: ComposeReplyInput): ComposeReplyResult => {
     return {
       message: {
         items: [],
-        text: "Ainda não encontrei uma opção no catálogo. Pode me dar mais detalhes?",
+        text: "I have not found an option in the catalog yet. Can you share more details?",
       },
       type: "text",
     };
@@ -83,7 +83,7 @@ const buildReply = (input: ComposeReplyInput): ComposeReplyResult => {
   return {
     message: {
       items: input.rankedItems,
-      text: `Encontrei ${first.title} e mais algumas opções que podem servir. Quer ver detalhes ou comprar agora?`,
+      text: `I found ${first.title} and some other options that may work. Would you like to view details or buy now?`,
     },
     type: "carousel",
   };
@@ -857,7 +857,7 @@ const runJob = async (db: Db, job: JobRow, model?: HostModel) => {
         if (job.turnId) {
           await completeTurnWithMessage(db, {
             content: {
-              text: "Recebi uma atualização mais recente e deixei esta solicitação de lado.",
+              text: "I received a newer update, so I set this request aside.",
             },
             outcome: "superseded",
             sessionId: session.id,
@@ -918,7 +918,7 @@ const runJob = async (db: Db, job: JobRow, model?: HostModel) => {
                       error: node.errorText,
                       nodeId: node.nodeId,
                     })),
-                    text: "Não consegui concluir essa solicitação porque uma etapa falhou. Vou encaminhar o problema para atendimento.",
+                    text: "I could not complete this request because a step failed. I will forward the issue to support.",
                   },
                   type: "text",
                 },

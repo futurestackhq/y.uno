@@ -3,31 +3,31 @@ import type { CatalogProduct, MerchantProfile, MockOrder } from "./types";
 export const YUNO_COMMISSION_BPS = 350;
 
 export const petzMerchant: MerchantProfile = {
-  legalName: "Petz Comércio e Participações S.A.",
+  legalName: "Petz Commerce and Holdings S.A.",
   name: "Petz",
-  routingConnectionName: "Petz · Brasil",
+  routingConnectionName: "Petz · Brazil",
   supportEmail: "commerce@petz.com.br",
 };
 
 export const petzCatalog: CatalogProduct[] = [
   {
-    category: "Alimentação",
+    category: "Food",
     id: "petz-racao-adulto",
-    name: "Ração seca para cães adultos",
-    priceCents: 8_990,
+    name: "Adult dry dog food",
+    priceCents: 8990,
     published: true,
   },
   {
-    category: "Higiene",
+    category: "Hygiene",
     id: "petz-tapete-higienico",
-    name: "Tapete higiênico premium",
-    priceCents: 6_790,
+    name: "Premium training pads",
+    priceCents: 6790,
     published: true,
   },
   {
-    category: "Bem-estar",
+    category: "Wellness",
     id: "petz-antipulgas",
-    name: "Antipulgas para cães até 10 kg",
+    name: "Flea treatment for dogs up to 10 kg",
     priceCents: 11_490,
     published: true,
   },
@@ -35,33 +35,33 @@ export const petzCatalog: CatalogProduct[] = [
 
 export const petzOrders: MockOrder[] = [
   {
-    createdAt: "Hoje, 10:32",
+    createdAt: "Today, 10:32 AM",
     customer: "Maria S.",
     id: "YC-2048",
-    productName: "Ração seca para cães adultos",
+    productName: "Adult dry dog food",
     status: "paid",
-    totalCents: 8_990,
+    totalCents: 8990,
   },
   {
-    createdAt: "Hoje, 09:47",
+    createdAt: "Today, 9:47 AM",
     customer: "Rafael M.",
     id: "YC-2047",
-    productName: "Antipulgas para cães até 10 kg",
+    productName: "Flea treatment for dogs up to 10 kg",
     status: "failed",
     totalCents: 11_490,
   },
   {
-    createdAt: "Ontem, 17:16",
+    createdAt: "Yesterday, 5:16 PM",
     customer: "Ana C.",
     id: "YC-2046",
-    productName: "Tapete higiênico premium",
+    productName: "Premium training pads",
     status: "paid",
     totalCents: 13_580,
   },
 ];
 
 export const formatCurrency = (valueCents: number) =>
-  new Intl.NumberFormat("pt-BR", {
+  new Intl.NumberFormat("en-US", {
     currency: "BRL",
     style: "currency",
   }).format(valueCents / 100);

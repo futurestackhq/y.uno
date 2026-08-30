@@ -123,10 +123,10 @@ const CommercePage = () => {
         setCheckoutOpen(false);
         setResetDialogOpen(false);
         await refreshCommerceQueries();
-        toast.success("Demo resetado com sucesso.");
+        toast.success("Demo reset successfully.");
       },
       onError: (error) => {
-        toast.error(`Não foi possível resetar o demo: ${error.message}`);
+        toast.error(`Unable to reset the demo: ${error.message}`);
       },
     })
   );
@@ -192,8 +192,8 @@ const CommercePage = () => {
                   variant="outline"
                 >
                   {resetDemoDataMutation.isPending
-                    ? "Limpando..."
-                    : "Resetar demo"}
+                    ? "Resetting..."
+                    : "Reset demo"}
                 </Button>
               </div>
             </CardHeader>
@@ -227,7 +227,7 @@ const CommercePage = () => {
                     type: "checkout_returned",
                     userId: "user_marta",
                   });
-                  toast.success("Pagamento realizado com o cartão salvo.");
+                  toast.success("Payment completed with the saved card.");
                   await refreshCommerceQueries();
                 }}
                 sendEnvelope={send}
@@ -307,11 +307,11 @@ const CommercePage = () => {
       <Dialog onOpenChange={setResetDialogOpen} open={resetDialogOpen}>
         <DialogContent showCloseButton>
           <DialogHeader>
-            <DialogTitle>Resetar demo?</DialogTitle>
+            <DialogTitle>Reset demo?</DialogTitle>
             <DialogDescription>
-              Isso apaga mensagens, sessões, jobs, pedidos, pagamentos e
-              catálogos do Yuno Commerce. Usuários e dados de outros módulos não
-              serão alterados.
+              This deletes Yuno Commerce messages, sessions, jobs, orders,
+              payments, and catalog data. Users and data from other modules will
+              not be changed.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
@@ -321,7 +321,7 @@ const CommercePage = () => {
               type="button"
               variant="outline"
             >
-              Cancelar
+              Cancel
             </Button>
             <Button
               disabled={resetDemoDataMutation.isPending}
@@ -331,7 +331,7 @@ const CommercePage = () => {
               type="button"
               variant="destructive"
             >
-              {resetDemoDataMutation.isPending ? "Limpando..." : "Resetar demo"}
+              {resetDemoDataMutation.isPending ? "Resetting..." : "Reset demo"}
             </Button>
           </DialogFooter>
         </DialogContent>

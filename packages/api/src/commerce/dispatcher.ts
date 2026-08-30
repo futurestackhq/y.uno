@@ -13,7 +13,7 @@ const nowIso = () => new Date().toISOString();
 export const buildDirectCheckoutMessage = (orderId: string) => ({
   openCheckout: true,
   orderId,
-  text: "Pedido pronto para pagamento.",
+  text: "Order ready for payment.",
 });
 
 const QUEUE_LEASE_MS = 60_000;
@@ -360,12 +360,12 @@ const handleQuickReply = async (
       }
       await completeTurnWithMessage(db, {
         content: {
-          buttons: [{ action: "confirm_payment", label: "Confirmar compra" }],
+          buttons: [{ action: "confirm_payment", label: "Confirm purchase" }],
           merchant: connection?.displayName ?? item.connectionId,
           orderId,
-          paymentHint: "Informe seu cartão para concluir o pagamento.",
+          paymentHint: "Enter your card details to complete payment.",
           subtitle: `1 unidade de ${item.title}`,
-          title: "Pedido criado",
+          title: "Order created",
           total: formattedPrice,
         },
         outcome: "succeeded",
@@ -378,7 +378,7 @@ const handleQuickReply = async (
 
     await completeTurnWithMessage(db, {
       content: {
-        actionLabel: "Comprar",
+        actionLabel: "Buy",
         catalogItemId: item.id,
         description: item.subtitle,
         price: formattedPrice,
@@ -587,8 +587,8 @@ const handleCheckoutReturned = async (
     content: {
       text:
         envelope.status === "paid"
-          ? "Pagamento realizado com sucesso! Seu pedido foi confirmado."
-          : "Não foi possível processar o pagamento. Tente novamente.",
+          ? "Payment completed successfully! Your order is confirmed."
+          : "Unable to process the payment. Please try again.",
     },
     outcome: envelope.status === "paid" ? "succeeded" : "failed",
     sessionId: session.id,

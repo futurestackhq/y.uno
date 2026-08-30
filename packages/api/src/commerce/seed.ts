@@ -64,7 +64,7 @@ export const seedDemoData = async (db: Db) => {
       kind: "sku" as const,
       priceCents: 18_990,
       subtitle: "Adulto • Frango",
-      title: "Ração Premium 10kg",
+      title: "Premium Pet Food 10kg",
     },
     {
       attributesJson: toAttributesJson({
@@ -80,7 +80,7 @@ export const seedDemoData = async (db: Db) => {
       kind: "service" as const,
       priceCents: 12_990,
       subtitle: "Agendamento • Pickup",
-      title: "Banho + Tosa (com leva e traz)",
+      title: "Bath + Grooming (with pickup and delivery)",
     },
     {
       attributesJson: toAttributesJson({
@@ -94,7 +94,7 @@ export const seedDemoData = async (db: Db) => {
       isActive: true,
       kind: "sku" as const,
       priceCents: 4990,
-      subtitle: "Pelos sensíveis",
+      subtitle: "Sensitive skin",
       title: "Shampoo Pet 500ml",
     },
     {
@@ -109,7 +109,7 @@ export const seedDemoData = async (db: Db) => {
       isActive: true,
       kind: "sku" as const,
       priceCents: 1990,
-      subtitle: "Borracha • Média",
+      subtitle: "Rubber • Medium",
       title: "Brinquedo Bola",
     },
   ];

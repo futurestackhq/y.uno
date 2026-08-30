@@ -15,19 +15,19 @@ interface CommerceOnboardingProps {
 
 const checklistItems = [
   {
-    description: "Confirme os dados que identificam sua operação.",
+    description: "Confirm the details that identify your business.",
     icon: Store,
-    title: "Dados do merchant",
+    title: "Merchant details",
   },
   {
-    description: "Publique os produtos que poderão aparecer no Whats.",
+    description: "Publish the products that can appear on WhatsApp.",
     icon: Link2,
-    title: "Catálogo conectado",
+    title: "Connected catalog",
   },
   {
-    description: "Aceite a comissão por vendas distribuídas pela Yuno.",
+    description: "Accept the commission on sales distributed by Yuno.",
     icon: ShieldCheck,
-    title: "Acordo comercial",
+    title: "Commercial agreement",
   },
 ] as const;
 
@@ -46,19 +46,19 @@ export const CommerceOnboarding = ({
       <div className="grid gap-6 lg:grid-cols-[1.15fr_0.85fr]">
         <section>
           <p className="text-primary text-sm font-semibold tracking-[0.18em] uppercase">
-            Novo canal de vendas
+            New sales channel
           </p>
           <h1 className="mt-3 max-w-xl text-4xl font-semibold tracking-tight">
-            Venda no Whats com a infraestrutura Yuno.
+            Sell on WhatsApp with Yuno infrastructure.
           </h1>
           <p className="text-muted-foreground mt-4 max-w-2xl text-base leading-7">
-            Configure sua participação no Yuno Commerce e deixe sua operação
-            elegível para ser descoberta por clientes no marketplace.
+            Set up your Yuno Commerce participation and make your business
+            eligible to be discovered by customers in the marketplace.
           </p>
         </section>
         <Card className="border-primary/20 bg-primary/[0.03]">
           <CardContent className="space-y-4 p-5">
-            <p className="text-sm font-medium">Sua jornada de ativação</p>
+            <p className="text-sm font-medium">Your activation journey</p>
             {checklistItems.map(({ description, icon: Icon, title }, index) => {
               const completed = isConfigured && index < 2;
               return (
@@ -93,24 +93,22 @@ export const CommerceOnboarding = ({
         <CardContent className="p-6">
           <div className="mb-6 flex items-center justify-between gap-4">
             <div>
-              <h2 className="text-lg font-semibold">
-                Configuração da operação
-              </h2>
+              <h2 className="text-lg font-semibold">Business setup</h2>
               <p className="text-muted-foreground mt-1 text-sm">
-                Dados demonstrativos da sua Commerce Connection.
+                Demo data for your Commerce Connection.
               </p>
             </div>
             {isConfigured ? (
               <span className="text-primary inline-flex items-center gap-1.5 text-sm font-medium">
                 <Check className="size-4" />
-                Pronta para revisão
+                Ready for review
               </span>
             ) : null}
           </div>
 
           <div className="grid gap-5 md:grid-cols-2">
             <div className="space-y-2">
-              <Label htmlFor="merchant-name">Nome exibido no marketplace</Label>
+              <Label htmlFor="merchant-name">Marketplace display name</Label>
               <Input
                 id="merchant-name"
                 onChange={(event) => setName(event.target.value)}
@@ -118,7 +116,7 @@ export const CommerceOnboarding = ({
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="support-email">E-mail de suporte</Label>
+              <Label htmlFor="support-email">Support email</Label>
               <Input
                 id="support-email"
                 onChange={(event) => setSupportEmail(event.target.value)}
@@ -127,25 +125,25 @@ export const CommerceOnboarding = ({
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="routing-connection">Connection de routing</Label>
+              <Label htmlFor="routing-connection">Routing connection</Label>
               <Input
                 disabled
                 id="routing-connection"
                 value={petzMerchant.routingConnectionName}
               />
               <p className="text-muted-foreground text-xs">
-                Sua configuração de routing atual continua independente.
+                Your current routing configuration remains independent.
               </p>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="catalog-source">Catálogo</Label>
+              <Label htmlFor="catalog-source">Catalog</Label>
               <Input
                 disabled
                 id="catalog-source"
-                value="3 produtos publicados"
+                value="3 published products"
               />
               <p className="text-muted-foreground text-xs">
-                Catálogo demonstrativo pronto para o canal Whats.
+                Demo catalog ready for the WhatsApp channel.
               </p>
             </div>
           </div>
@@ -153,7 +151,7 @@ export const CommerceOnboarding = ({
           <div className="mt-7 flex justify-end">
             {isConfigured ? (
               <Button onClick={onOpenAgreement} type="button">
-                Revisar acordo comercial
+                Review commercial agreement
                 <ChevronRight className="size-4" />
               </Button>
             ) : (
@@ -162,7 +160,7 @@ export const CommerceOnboarding = ({
                 onClick={() => setIsConfigured(true)}
                 type="button"
               >
-                Salvar e revisar
+                Save and review
                 <ChevronRight className="size-4" />
               </Button>
             )}

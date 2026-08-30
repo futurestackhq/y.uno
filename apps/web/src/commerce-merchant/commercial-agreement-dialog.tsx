@@ -42,25 +42,25 @@ export const CommercialAgreementDialog = ({
           <p className="text-primary text-xs font-semibold tracking-[0.16em] uppercase">
             Yuno Commerce
           </p>
-          <DialogTitle>Acordo comercial de marketplace</DialogTitle>
+          <DialogTitle>Marketplace commercial agreement</DialogTitle>
           <DialogDescription>
-            Este é um aceite demonstrativo para habilitar a Petz no canal Whats.
+            This is a demo acceptance to enable Petz on the WhatsApp channel.
           </DialogDescription>
         </DialogHeader>
         <div className="bg-muted/30 space-y-4 rounded-lg border p-4 text-sm">
           <p>
-            A Yuno disponibiliza o catálogo da Petz no marketplace e mantém a
-            atribuição da venda ao canal Whats.
+            Yuno makes the Petz catalog available in the marketplace and keeps
+            the sale attributed to the WhatsApp channel.
           </p>
           <div className="bg-background rounded-md p-3">
-            <p className="text-muted-foreground text-xs">Comissão Yuno</p>
+            <p className="text-muted-foreground text-xs">Yuno commission</p>
             <p className="mt-1 text-2xl font-semibold">
-              {commissionPercentage.toFixed(1)}% por venda aprovada
+              {commissionPercentage.toFixed(1)}% per approved sale
             </p>
           </div>
           <p className="text-muted-foreground">
-            Exemplo: em uma venda de R$ 100,00, a comissão demonstrada é de R$
-            {commissionPercentage.toFixed(2).replace(".", ",")}.
+            Example: on a R$100.00 sale, the demo commission is R$
+            {commissionPercentage.toFixed(2)}.
           </p>
         </div>
         <div className="flex items-start gap-3">
@@ -70,8 +70,8 @@ export const CommercialAgreementDialog = ({
             onCheckedChange={(value) => setAccepted(value === true)}
           />
           <Label className="leading-5" htmlFor="commercial-agreement">
-            Li e aceito os termos comerciais demonstrativos para ativar minha
-            participação no Yuno Commerce.
+            I have read and accept the demo commercial terms to activate my Yuno
+            Commerce participation.
           </Label>
         </div>
         <DialogFooter>
@@ -80,7 +80,7 @@ export const CommercialAgreementDialog = ({
             type="button"
             variant="outline"
           >
-            Voltar
+            Back
           </Button>
           <Button
             disabled={!accepted}
@@ -90,7 +90,7 @@ export const CommercialAgreementDialog = ({
             }}
             type="button"
           >
-            Aceitar e ativar
+            Accept and activate
           </Button>
         </DialogFooter>
       </DialogContent>

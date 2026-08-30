@@ -22,10 +22,12 @@
 ### Task 1: Define the direct-confirmation protocol
 
 **Files:**
+
 - Modify: `packages/api/src/commerce/types.ts:25-50`
 - Modify: `packages/api/src/commerce/dispatcher.test.ts:1-41`
 
 **Interfaces:**
+
 - Consumes: `quickReplyActionSchema` and the quick-reply branch of `Envelope`.
 - Produces: `QuickReplyAction` including `"confirm_order"` and `getInboundFollowUpText()` support for that action.
 
@@ -73,10 +75,12 @@ Expected: PASS.
 ### Task 2: Create orders from direct confirmation
 
 **Files:**
+
 - Modify: `packages/api/src/commerce/dispatcher.ts:293-373`
 - Test: `packages/api/src/commerce/dispatcher.test.ts`
 
 **Interfaces:**
+
 - Consumes: `{ type: "quick_reply", action: "confirm_order", catalogItemId, sessionId, userId }`.
 - Produces: one draft order and `buildDirectCheckoutMessage(orderId)` returning `{ openCheckout: true, orderId, text: "Pedido pronto para pagamento." }`.
 
@@ -87,7 +91,7 @@ Export `buildDirectCheckoutMessage` from `dispatcher.ts` and add this unit test:
 ```ts
 it("builds the direct checkout response", () => {
   expect(buildDirectCheckoutMessage("order_1")).toEqual({
-  openCheckout: true,
+    openCheckout: true,
     orderId: "order_1",
     text: "Pedido pronto para pagamento.",
   });
@@ -127,10 +131,12 @@ Expected: PASS.
 ### Task 3: Make the detail bubble confirm the order
 
 **Files:**
+
 - Modify: `apps/whats/src/whatsapp/use-local-conversation.ts:45-185`
 - Modify: `apps/whats/src/whatsapp/whats-interactive-message.tsx:95-117`
 
 **Interfaces:**
+
 - Consumes: product detail content `{ catalogItemId, title, description, price }`.
 - Produces: `WhatsMessage` with `kind: "product_detail"` and CTA action `"confirm_order"`.
 
@@ -188,10 +194,12 @@ Expected: PASS.
 ### Task 4: Open checkout from the direct-confirmation response
 
 **Files:**
+
 - Modify: `apps/whats/src/whatsapp/use-local-conversation.ts:211-350`
 - Modify: `apps/whats/src/routes/index.tsx:16-59`
 
 **Interfaces:**
+
 - Consumes: remote assistant text content `{ openCheckout: true, orderId: string }`.
 - Produces: `checkoutOrderId` state set to that `orderId`.
 
@@ -200,8 +208,9 @@ Expected: PASS.
 Add this test to `apps/whats/src/whatsapp/use-local-conversation.test.ts` after exporting `getCheckoutOrderId`:
 
 ```ts
-expect(getCheckoutOrderId({ openCheckout: true, orderId: "order_1" }))
-  .toBe("order_1");
+expect(getCheckoutOrderId({ openCheckout: true, orderId: "order_1" })).toBe(
+  "order_1"
+);
 expect(getCheckoutOrderId({ openCheckout: true })).toBeNull();
 ```
 
@@ -224,9 +233,11 @@ Expected: PASS.
 ### Task 5: Verify the whole commerce journey
 
 **Files:**
+
 - Modify: none unless verification reveals a defect.
 
 **Interfaces:**
+
 - Consumes: live local app at `apps/whats`.
 - Produces: verified direct checkout behavior.
 

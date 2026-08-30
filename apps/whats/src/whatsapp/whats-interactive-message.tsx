@@ -46,7 +46,7 @@ export const WhatsInteractiveMessage = ({
               Yuno Commerce Flow
             </p>
             <p className="mt-1 text-xs leading-4 text-[#667781]">
-              Dados de entrega e pagamento prontos para a próxima etapa.
+              Delivery and payment details are ready for the next step.
             </p>
             <button
               className="mt-2 text-xs font-medium text-[#008069]"

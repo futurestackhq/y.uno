@@ -19,7 +19,7 @@ it("serializes the current host plan for the inspector", () => {
     currentHostPlan: serializeCurrentHostPlan({
       baseRevision: 3,
       decisionJson: '{"state":"ready_to_delegate"}',
-      decisionSummary: "Plano atualizado com a preferência do cliente.",
+      decisionSummary: "Plan updated with the customer's preference.",
       id: "plan-3",
       status: "persisted",
     }),

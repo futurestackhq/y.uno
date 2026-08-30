@@ -9,7 +9,7 @@ describe("direct checkout response", () => {
     expect(buildDirectCheckoutMessage("order_1")).toEqual({
       openCheckout: true,
       orderId: "order_1",
-      text: "Pedido pronto para pagamento.",
+      text: "Order ready for payment.",
     });
   });
 });
@@ -18,12 +18,12 @@ describe("inbound orchestration", () => {
   it("uses the user text from the envelope", () => {
     const envelope: Envelope = {
       idempotencyKey: "idem_1",
-      text: "Quero comprar ração",
+      text: "I want to buy pet food",
       type: "user_text",
       userId: "user_1",
     };
 
-    expect(getInboundFollowUpText(envelope)).toBe("Quero comprar ração");
+    expect(getInboundFollowUpText(envelope)).toBe("I want to buy pet food");
   });
 
   it("creates meaningful follow-up input for quick replies", () => {

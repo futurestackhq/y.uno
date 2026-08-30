@@ -12,10 +12,10 @@ const snapshot: HostContextSnapshot = {
       kind: "sku",
       priceCents: 1000,
       subtitle: "Frango",
-      title: "Ração premium",
+      title: "Premium pet food",
     },
   ],
-  envelope: { text: "detalhes", type: "user_text", userId: "user_a" },
+  envelope: { text: "details", type: "user_text", userId: "user_a" },
   explicitSession: null,
   recentMessages: [],
   recentResults: [],
@@ -31,7 +31,7 @@ const snapshot: HostContextSnapshot = {
 };
 
 it("searches only the catalog snapshot", () => {
-  expect(searchCatalogSnapshot(snapshot, "ração frango")).toHaveLength(1);
+  expect(searchCatalogSnapshot(snapshot, "pet food frango")).toHaveLength(1);
 });
 
 it("exposes only read-only snapshot tools", () => {

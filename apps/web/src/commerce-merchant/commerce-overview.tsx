@@ -31,14 +31,14 @@ interface CommerceOverviewProps {
 type OrderFilter = "all" | MockOrderStatus;
 
 const orderFilterLabels: Record<OrderFilter, string> = {
-  all: "Todos",
-  failed: "Falhos",
-  paid: "Aprovados",
+  all: "All",
+  failed: "Failed",
+  paid: "Approved",
 };
 
 const statusLabel: Record<MockOrderStatus, string> = {
-  failed: "Falhou",
-  paid: "Aprovado",
+  failed: "Failed",
+  paid: "Approved",
 };
 
 const isOrderFilter = (value: string): value is OrderFilter =>
@@ -85,41 +85,42 @@ export const CommerceOverview = ({ onReset }: CommerceOverviewProps) => {
           <div className="flex items-center gap-2">
             <Badge className="gap-1.5" variant="secondary">
               <CheckCircle2 className="text-primary size-3.5" />
-              Elegível no marketplace
+              Eligible for the marketplace
             </Badge>
           </div>
           <h1 className="mt-3 text-3xl font-semibold tracking-tight">
-            Yuno Commerce para {petzMerchant.name}
+            Yuno Commerce for {petzMerchant.name}
           </h1>
           <p className="text-muted-foreground mt-2">
-            Sua Commerce Connection está ativa e pronta para vender pelo Whats.
+            Your Commerce Connection is active and ready to sell through
+            WhatsApp.
           </p>
         </div>
         <Button onClick={onReset} type="button" variant="outline">
           <RotateCcw className="size-4" />
-          Reiniciar demo
+          Reset demo
         </Button>
       </section>
 
       <div className="grid gap-4 md:grid-cols-3">
         <MetricCard
-          detail="produtos disponíveis"
+          detail="available products"
           icon={Package}
-          label="Catálogo publicado"
+          label="Published catalog"
           value={String(
             petzCatalog.filter((product) => product.published).length
           )}
         />
         <MetricCard
-          detail="pedidos pelo canal Whats"
+          detail="orders through WhatsApp"
           icon={ShoppingBag}
-          label="Vendas aprovadas"
+          label="Approved sales"
           value={String(paidOrders.length)}
         />
         <MetricCard
-          detail={`${(YUNO_COMMISSION_BPS / 100).toFixed(1)}% de comissão Yuno`}
+          detail={`${(YUNO_COMMISSION_BPS / 100).toFixed(1)}% Yuno commission`}
           icon={CircleDollarSign}
-          label="Receita distribuída"
+          label="Distributed revenue"
           value={formatCurrency(totalSales - commissionCents)}
         />
       </div>
@@ -127,7 +128,7 @@ export const CommerceOverview = ({ onReset }: CommerceOverviewProps) => {
       <div className="grid gap-6 xl:grid-cols-[0.85fr_1.65fr]">
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Produtos publicados</CardTitle>
+            <CardTitle className="text-base">Published products</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
             {petzCatalog.map((product) => (
@@ -152,7 +153,7 @@ export const CommerceOverview = ({ onReset }: CommerceOverviewProps) => {
         <Card>
           <CardHeader className="gap-4 sm:flex-row sm:items-center sm:justify-between">
             <CardTitle className="text-base">
-              Pedidos originados no Whats
+              Orders originating from WhatsApp
             </CardTitle>
             <div className="bg-muted flex gap-1 rounded-lg p-1">
               {Object.entries(orderFilterLabels).map(([value, label]) => (
@@ -176,10 +177,10 @@ export const CommerceOverview = ({ onReset }: CommerceOverviewProps) => {
             <table className="w-full min-w-[600px] text-left text-sm">
               <thead className="text-muted-foreground border-b text-xs">
                 <tr>
-                  <th className="pb-3 font-medium">Pedido</th>
-                  <th className="pb-3 font-medium">Cliente</th>
-                  <th className="pb-3 font-medium">Origem</th>
-                  <th className="pb-3 font-medium">Valor</th>
+                  <th className="pb-3 font-medium">Order</th>
+                  <th className="pb-3 font-medium">Customer</th>
+                  <th className="pb-3 font-medium">Source</th>
+                  <th className="pb-3 font-medium">Amount</th>
                   <th className="pb-3 font-medium">Status</th>
                 </tr>
               </thead>
@@ -196,7 +197,7 @@ export const CommerceOverview = ({ onReset }: CommerceOverviewProps) => {
                       </button>
                     </td>
                     <td className="py-3">{order.customer}</td>
-                    <td className="text-muted-foreground py-3">Whats</td>
+                    <td className="text-muted-foreground py-3">WhatsApp</td>
                     <td className="py-3">{formatCurrency(order.totalCents)}</td>
                     <td className="py-3">
                       <Badge
@@ -213,10 +214,10 @@ export const CommerceOverview = ({ onReset }: CommerceOverviewProps) => {
             </table>
             {selectedOrder ? (
               <div className="bg-muted/30 mt-5 rounded-lg border p-4 text-sm">
-                <p className="font-medium">Pedido {selectedOrder.id}</p>
+                <p className="font-medium">Order {selectedOrder.id}</p>
                 <p className="text-muted-foreground mt-1">
                   {selectedOrder.productName} · {selectedOrder.createdAt} ·
-                  Canal Whats
+                  WhatsApp channel
                 </p>
               </div>
             ) : null}
