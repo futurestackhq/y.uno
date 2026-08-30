@@ -1,0 +1,41 @@
+@import "tailwindcss";
+
+@source "./**/*.{ts,tsx}";
+
+:root {
+  --background: #efeae2;
+  --foreground: #111b21;
+  --muted-foreground: #667781;
+  --primary: #00a884;
+  --border: #d1d7db;
+  --wa-header: #008069;
+  --wa-chat-wallpaper: #efeae2;
+  --wa-bubble-in: #ffffff;
+  --wa-bubble-out: #d9fdd3;
+  --wa-composer: #f0f2f5;
+  --wa-icon: #54656f;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#app {
+  min-height: 100%;
+  margin: 0;
+}
+
+body {
+  min-width: 960px;
+  background: var(--background);
+  color: var(--foreground);
+  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+}
+
+button,
+input,
+textarea {
+  font: inherit;
+}

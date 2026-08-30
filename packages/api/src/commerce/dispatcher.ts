@@ -9,6 +9,13 @@ import { envelopeSchema, getInboundFollowUpText } from "./types";
 import type { Envelope } from "./types";
 
 const nowIso = () => new Date().toISOString();
+
+export const buildDirectCheckoutMessage = (orderId: string) => ({
+  openCheckout: true,
+  orderId,
+  text: "Pedido pronto para pagamento.",
+});
+
 const QUEUE_LEASE_MS = 60_000;
 
 const addMessage = async (
@@ -261,6 +268,7 @@ const handleQuickReply = async (
       catalogItemId: envelope.catalogItemId,
       orderId: envelope.orderId,
       quickReply: envelope.action,
+      sourceMessageId: envelope.sourceMessageId,
     },
     requestId: envelope.idempotencyKey ?? meta.turnId,
     role: "user",
@@ -290,7 +298,11 @@ const handleQuickReply = async (
     sessionId: envelope.sessionId,
   });
 
-  if (envelope.action === "details" || envelope.action === "buy") {
+  if (
+    envelope.action === "details" ||
+    envelope.action === "buy" ||
+    envelope.action === "confirm_order"
+  ) {
     if (!envelope.catalogItemId) {
       throw new Error("Product action requires a catalog item");
     }
@@ -312,7 +324,7 @@ const handleQuickReply = async (
       currency: item.currency,
       style: "currency",
     }).format(item.priceCents / 100);
-    if (envelope.action === "buy") {
+    if (envelope.action === "buy" || envelope.action === "confirm_order") {
       const orderId = crypto.randomUUID();
       const timestamp = nowIso();
       await db.batch([
@@ -336,6 +348,16 @@ const handleQuickReply = async (
           unitPriceCents: item.priceCents,
         }),
       ]);
+      if (envelope.action === "confirm_order") {
+        await completeTurnWithMessage(db, {
+          content: buildDirectCheckoutMessage(orderId),
+          outcome: "succeeded",
+          sessionId: session.id,
+          turnId: meta.turnId,
+          type: "text",
+        });
+        return;
+      }
       await completeTurnWithMessage(db, {
         content: {
           buttons: [{ action: "confirm_payment", label: "Confirmar compra" }],
@@ -356,9 +378,14 @@ const handleQuickReply = async (
 
     await completeTurnWithMessage(db, {
       content: {
+        actionLabel: "Comprar",
+        catalogItemId: item.id,
+        description: item.subtitle,
+        price: formattedPrice,
         text: [item.title, item.subtitle, formattedPrice]
           .filter((part): part is string => Boolean(part))
           .join("\n"),
+        title: item.title,
       },
       outcome: "succeeded",
       sessionId: session.id,
@@ -427,6 +454,7 @@ async function enqueueInboundHostFollowUp(
   });
 }
 
+// oxlint-disable-next-line complexity
 const handleCheckoutReturned = async (
   db: Db,
   envelope: Extract<Envelope, { type: "checkout_returned" }>,
@@ -451,6 +479,13 @@ const handleCheckoutReturned = async (
     .limit(1);
   if (!order) {
     throw new Error("Order not found for this commerce session");
+  }
+  if (order.status !== "draft") {
+    await db
+      .update(schema.commerceTurns)
+      .set({ status: "succeeded", updatedAt: nowIso() })
+      .where(eq(schema.commerceTurns.id, meta.turnId));
+    return;
   }
 
   const { paymentMethodId: existingPaymentMethodId } = order;
@@ -477,17 +512,41 @@ const handleCheckoutReturned = async (
   }
 
   if (envelope.status === "paid" && !paymentMethodId) {
+    const [defaultPaymentMethod] = await db
+      .select({ id: schema.paymentMethods.id })
+      .from(schema.paymentMethods)
+      .where(
+        and(
+          eq(schema.paymentMethods.userId, envelope.userId),
+          eq(schema.paymentMethods.isDefault, true)
+        )
+      )
+      .orderBy(desc(schema.paymentMethods.createdAt))
+      .limit(1);
+    paymentMethodId = defaultPaymentMethod?.id ?? null;
+  }
+
+  if (envelope.status === "paid" && !paymentMethodId) {
     throw new Error("No saved payment method is available for this payment");
   }
 
-  await db
+  const paymentUpdate = await db
     .update(schema.orders)
     .set({
       paymentMethodId,
       status: envelope.status === "paid" ? "paid" : "failed",
       updatedAt: nowIso(),
     })
-    .where(eq(schema.orders.id, order.id));
+    .where(
+      and(eq(schema.orders.id, order.id), eq(schema.orders.status, "draft"))
+    );
+  if (paymentUpdate.meta.changes === 0) {
+    await db
+      .update(schema.commerceTurns)
+      .set({ status: "succeeded", updatedAt: nowIso() })
+      .where(eq(schema.commerceTurns.id, meta.turnId));
+    return;
+  }
   const messageId = await addMessage(db, {
     content: { orderId: envelope.orderId, status: envelope.status },
     requestId: envelope.idempotencyKey ?? meta.turnId,

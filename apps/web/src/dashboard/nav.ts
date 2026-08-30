@@ -17,13 +17,14 @@ import {
 export interface DashboardNavItem {
   label: string;
   icon: LucideIcon;
-  to?: "/routing" | "/commerce";
+  to?: "/routing" | "/commerce" | "/yuno-commerce";
 }
 
 export const dashboardNav: DashboardNavItem[] = [
   { icon: Monitor, label: "Home", to: "/commerce" },
   { icon: Box, label: "Connections" },
-  { icon: ShoppingCart, label: "Yuno Commerce", to: "/commerce" },
+  { icon: Terminal, label: "Debug", to: "/commerce" },
+  { icon: ShoppingCart, label: "Yuno Commerce", to: "/yuno-commerce" },
   { icon: GitBranch, label: "Routing", to: "/routing" },
   { icon: ArrowLeftRight, label: "Payments" },
   { icon: Repeat, label: "Reconciliations" },

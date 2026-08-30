@@ -138,6 +138,7 @@ export const buildHostSynthesisPrompt = (params: HostPromptParams): string =>
     "Write a concise, user-facing assistant message.",
     "Fill content fields used by the selected message type; use empty arrays or null for every unrelated field.",
     'For every carousel card, return exactly two CTAs: { action: "details", label: "Ver detalhes" } and { action: "buy", label: "Comprar" }.',
+    'For purchase_summary, set title to "Confirmar compra", and always include the selected product in subtitle plus the store name in merchant, alongside orderId, total, and the confirmation button.',
     "Never expose private reasoning or internal operational details.",
     "",
     "Synthesis context:",
