@@ -9,6 +9,7 @@
 ## 1. Goal (what we are building)
 
 Build a demoable **consumer-facing** sales channel called **Yuno Commerce** with:
+
 - a **WhatsApp Web–like chat surface** (chat-only),
 - an **orchestrator (host)** that turns messages into **sessions (one session = one request/pedido)**,
 - **plans** per session (tasks + dependencies), where parallelizable tasks run via **subagents**,
@@ -51,7 +52,7 @@ We will simulate a subset of WhatsApp interactive surfaces in a web-only UI:
   - Horizontal scroll with **scroll-snap** (desktop trackpad friendly).
   - Each card: image placeholder/logo, title, 1–2 metadata lines (price/SLA), and a primary action.
   - **Interaction (MVP):** each card has its own CTA button (e.g. “Escolher”, “Ver detalhes”, “Agendar”).
-  - Optional: allow **2 CTAs per card** *only when both are “quick-reply-like” actions* (see constraints below).
+  - Optional: allow **2 CTAs per card** _only when both are “quick-reply-like” actions_ (see constraints below).
   - Used for: product recommendations (Raia/Carrefour), option comparison, and selectable time windows (Petz).
 - **List message (secondary)** — compact list for 6–10 choices
   - Used when there are too many options for a carousel.
@@ -69,7 +70,7 @@ Even though we render our own components (web-only), we will keep message UX wit
 - **Header / footer text**: short (≤60 chars)
 - **Carousel buttons (WhatsApp Cloud API behavior)**:
   - In **interactive media carousel messages**, each card supports **either**:
-    - **1 URL button** *or*
+    - **1 URL button** _or_
     - **1+ quick-reply buttons** (e.g. 2 quick replies)
   - You **cannot** mix URL + quick-reply buttons in the same carousel.
 - Prefer carousel for “top 3–5”, list for “6–10”.
@@ -96,22 +97,25 @@ Even though we render our own components (web-only), we will keep message UX wit
 
 ## 4. “Connections” (mock partners) used in pitch
 
-We will use **known brands** as *mocked* connections (demo only, no implied partnership):
+We will use **known brands** as _mocked_ connections (demo only, no implied partnership):
 
-1. **Petz** — *service workflow* (end-to-end)  
+1. **Petz** — _service workflow_ (end-to-end)
    - “Banho & Tosa (leva‑e‑traz)” with pickup and status updates.
-2. **Droga Raia / Drogasil** — product flow  
+2. **Droga Raia / Drogasil** — product flow
    - OTC + equivalents (genérico/referência).
-3. **Carrefour** — product flow  
+3. **Carrefour** — product flow
    - Market cart-like selection + substitution logic (mocked).
 
 Each connection has its own mocked:
+
 - catalog (SKUs / services)
 - SLA metadata
 - commission metadata (used for ranking)
 
 ### 4.1 Ranking defaults (MVP)
+
 For product recommendations we rank using a simple weighted score:
+
 - **Price**: 55%
 - **SLA / availability**: 25%
 - **Commission**: 20%
@@ -138,6 +142,7 @@ This is a pitch-friendly default (easy to explain) and is configurable per conne
 Recommendation: `done` after purchase + inactivity TTL for `awaiting_user` / `checkout_pending`.
 
 #### 5.2.1 TTL defaults (MVP)
+
 - `awaiting_user`: 30 minutes
 - `checkout_pending`: 15 minutes
 - `active` sessions: soft idle warning after 10 minutes (no state change), hard expire after 2 hours
@@ -149,11 +154,13 @@ Recommendation: `done` after purchase + inactivity TTL for `awaiting_user` / `ch
 ### 6.1 Core rule: orchestrator asks when in doubt
 
 If the orchestrator lacks required inputs to progress a session:
+
 - it **asks a question** to the user (in chat and/or Flow drawer),
 - sets the session to `awaiting_user`,
 - does **not** release execution tasks to subagents until requirements are satisfied.
 
 When the user answers:
+
 - if it is a follow-up: it fills missing requirements in the same session,
 - if it is a new intent: it starts a new session (without blocking the old one),
 - orchestrator then **replans** and releases only the now-ready phases.
@@ -175,6 +182,7 @@ Each session has a plan as a **DAG** of tasks with dependencies, e.g. product in
 
 Parallel tasks run as separate jobs.  
 If one partner fetch fails, the orchestrator:
+
 - marks that task as `failed`,
 - continues with other results (degradation),
 - records a warning in logs (optional surface in UI).
@@ -184,31 +192,38 @@ If one partner fetch fails, the orchestrator:
 ## 7. Flow drawer (MetaFlows-like) inside Panel 1 (chat)
 
 ### 7.1 Why
+
 Collect required inputs without flooding the chat, while keeping sessions/logs visible.
 
 ### 7.2 Behavior
+
 - Agent sends a “Flow card” message (WhatsApp-like).
 - **Drawer opens only by user intent**: user clicks “Preencher dados” → opens a **drawer** inside the chat panel.
 - Drawer has: header, fields, CTA confirm, close.
- - Flow drawer can optionally render **a carousel of prefilled suggestions** (e.g. time windows), but the MVP must still work with plain fields only.
+- Flow drawer can optionally render **a carousel of prefilled suggestions** (e.g. time windows), but the MVP must still work with plain fields only.
 
 ### 7.2.1 Source of Flow conventions
+
 Flow UX constraints and interactive-message ergonomics are inspired by:
+
 - `AI Docs/Iris/Iris - WhatsApp Conventions.md` (Obsidian vault)
 
 ### 7.3 Petz service workflow (MVP scope)
 
 Required fields (minimal to simulate):
+
 - `pickup_address`
 - `pickup_window`
 - `handoff_instructions`
 
 After submit:
+
 - orchestrator stores slots, replans, releases tasks.
 
 ### 7.4 Fulfillment updates (mock)
 
 After “order created”, Petz session triggers background updates (jobs) that post status messages:
+
 - “Estamos indo buscar seu pet…”
 - “Retirada feita — pode entregar na portaria…”
 - “Banho e tosa em andamento…”
@@ -232,6 +247,7 @@ We simulate a mobile-like external browser for payments:
   - payment confirmation screen + “Voltar para o WhatsApp”
 
 **Return to chat (deep link simulation):**
+
 - The checkout confirmation screen includes a button “**Voltar para o WhatsApp**”.
 - Clicking it simulates a deep link back to the chat app:
   - closes the drawer (browser view)
@@ -252,8 +268,7 @@ After the first successful purchase (and card saved/tokenized):
   - Buttons (WhatsApp-like): **Confirmar** / **Trocar cartão**
 - Clicking **Confirmar** completes the payment using the saved token and returns a receipt message.
 
-**Token portability (pitch rule):**
-We assume the saved token can be reused across different connections/merchants (mentor-confirmed Yuno capability), so the “saved card” experience works across the marketplace.
+**Token portability (pitch rule):** We assume the saved token can be reused across different connections/merchants (mentor-confirmed Yuno capability), so the “saved card” experience works across the marketplace.
 
 ### 7.7 Buy-click behavior (always show a summary before payment)
 
@@ -273,6 +288,7 @@ When the user clicks **Comprar** on a carousel card:
 ## 8. Queue + processing strategy (MVP)
 
 See decisions log. Summary for MVP:
+
 - Queue: **D1/SQLite tables** (`message_queue`, `jobs`).
 - Consumer: **on-demand tick** (UI-driven or server-called immediately after enqueue).
 
@@ -287,6 +303,7 @@ See decisions log. Summary for MVP:
   - web `useChat` + `Streamdown`.
 
 The AI layer is used primarily for:
+
 - intent detection + slot filling (safe, constrained),
 - planning (task graph),
 - response phrasing (formatting).
@@ -301,4 +318,3 @@ Tool execution is delegated to subagents/jobs and logged.
 - Ranking weights (price vs SLA vs commission).
 - Which WhatsApp-like rich components we’ll simulate first (carousel vs list vs both) — current default is: carousel + list + flow-card.
 - Checkout return to chat is via “Voltar para o WhatsApp” (deep link simulation).
-

@@ -24,6 +24,7 @@ local.db-*
 !.vscode/launch.json
 !.vscode/extensions.json
 .idea
+.superpowers/
 *.swp
 *.swo
 *~

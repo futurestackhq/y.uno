@@ -1,0 +1,41 @@
+{
+  "version": "7",
+  "dialect": "sqlite",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "6",
+      "when": 1788052564869,
+      "tag": "0000_last_thunderbird",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1788063016756,
+      "tag": "0001_curious_adam_destine",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1788063390915,
+      "tag": "0002_romantic_annihilus",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1788071718425,
+      "tag": "0003_strange_wolverine",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1788076240553,
+      "tag": "0004_pretty_stranger",
+      "breakpoints": true
+    }
+  ]
+}

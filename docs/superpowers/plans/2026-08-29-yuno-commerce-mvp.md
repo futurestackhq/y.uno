@@ -27,6 +27,7 @@
 ## File Structure (locked in by this plan)
 
 **Backend**
+
 - Create: `packages/db/src/schema.ts` — Drizzle schema for sessions/queue/jobs/messages/orders/payment_methods.
 - Create: `packages/api/src/routers/commerce.ts` — tRPC router implementing envelopes, tick, reads.
 - Modify: `packages/api/src/routers/index.ts` — mount `commerce` router.
@@ -34,6 +35,7 @@
 - Modify: `packages/db/src/index.ts` — export `schema` + db creator (keep `createDb()`).
 
 **Web**
+
 - Create: `apps/web/src/routes/_dashboard/commerce/index.tsx` — `/commerce` 3-panel page (chat + sessions + logs).
 - Create: `apps/web/src/routes/checkout.tsx` — `/checkout` page UI (mock transparent checkout).
 - Create: `apps/web/src/commerce/types.ts` — shared UI types (message payloads, quick-reply actions).
@@ -49,11 +51,13 @@
 ## Task 1: Fix DB package schema + migrations baseline
 
 **Files:**
+
 - Create: `packages/db/src/schema.ts`
 - Modify: `packages/db/src/index.ts`
 - Create (generated): `packages/db/src/migrations/*`
 
 **Interfaces:**
+
 - Produces: `schema` exports and `createDb(): ReturnType<typeof drizzle>`
 - Consumed by: `packages/api/src/context.ts` (Task 2)
 
@@ -101,7 +105,14 @@ export const sessions = sqliteTable("sessions", {
   userId: text("user_id").notNull(),
   intent: text("intent").notNull(),
   status: text("status", {
-    enum: ["active", "awaiting_user", "checkout_pending", "done", "expired", "failed"],
+    enum: [
+      "active",
+      "awaiting_user",
+      "checkout_pending",
+      "done",
+      "expired",
+      "failed",
+    ],
   }).notNull(),
   requirementsJson: text("requirements_json").notNull(),
   planJson: text("plan_json").notNull(),
@@ -116,7 +127,14 @@ export const messages = sqliteTable("messages", {
   sessionId: text("session_id"),
   role: text("role", { enum: ["user", "assistant", "system"] }).notNull(),
   type: text("type", {
-    enum: ["text", "carousel", "list", "flow_card", "receipt", "purchase_summary"],
+    enum: [
+      "text",
+      "carousel",
+      "list",
+      "flow_card",
+      "receipt",
+      "purchase_summary",
+    ],
   }).notNull(),
   contentJson: text("content_json").notNull(),
   createdAt: text("created_at").notNull().$defaultFn(now),
@@ -128,7 +146,9 @@ export const messageQueue = sqliteTable("message_queue", {
   receivedAt: text("received_at").notNull().$defaultFn(now),
   type: text("type").notNull(),
   payloadJson: text("payload_json").notNull(),
-  status: text("status", { enum: ["pending", "processing", "done", "failed"] }).notNull(),
+  status: text("status", {
+    enum: ["pending", "processing", "done", "failed"],
+  }).notNull(),
   error: text("error"),
 });
 
@@ -137,7 +157,9 @@ export const jobs = sqliteTable("jobs", {
   sessionId: text("session_id").notNull(),
   kind: text("kind").notNull(),
   inputJson: text("input_json").notNull(),
-  status: text("status", { enum: ["queued", "running", "done", "failed"] }).notNull(),
+  status: text("status", {
+    enum: ["queued", "running", "done", "failed"],
+  }).notNull(),
   leaseExpiresAt: text("lease_expires_at"),
   attempts: integer("attempts").notNull(),
   createdAt: text("created_at").notNull().$defaultFn(now),
@@ -158,7 +180,9 @@ export const orders = sqliteTable("orders", {
   sessionId: text("session_id").notNull(),
   connectionId: text("connection_id").notNull(),
   paymentMethodId: text("payment_method_id"),
-  status: text("status", { enum: ["draft", "checkout_started", "paid", "failed", "fulfilled"] }).notNull(),
+  status: text("status", {
+    enum: ["draft", "checkout_started", "paid", "failed", "fulfilled"],
+  }).notNull(),
   totalCents: integer("total_cents").notNull(),
   currency: text("currency").notNull(),
   createdAt: text("created_at").notNull().$defaultFn(now),
@@ -236,11 +260,13 @@ git commit -m "feat(db): add commerce schema baseline"
 ## Task 2: Add DB to tRPC context and create commerce router shell
 
 **Files:**
+
 - Modify: `packages/api/src/context.ts`
 - Create: `packages/api/src/routers/commerce.ts`
 - Modify: `packages/api/src/routers/index.ts`
 
 **Interfaces:**
+
 - Produces: `ctx.db` in tRPC context and `commerce.*` procedures
 - Consumed by: web (Tasks 5–7)
 
@@ -351,12 +377,14 @@ git commit -m "feat(api): add commerce router skeleton"
 ## Task 3: Implement envelope persistence + tick loop (single-threaded MVP)
 
 **Files:**
+
 - Modify: `packages/api/src/routers/commerce.ts`
 - Create: `packages/api/src/commerce/orchestrator.ts`
 - Create: `packages/api/src/commerce/types.ts`
 - Test: `packages/api/src/commerce/orchestrator.test.ts`
 
 **Interfaces:**
+
 - Produces:
   - `enqueueEnvelope(ctx, envelope): Promise<{ envelopeId: string }>`
   - `tickOnce(ctx): Promise<void>`
@@ -442,9 +470,7 @@ export function computeRankingScore(input: {
 
 export function nextPaymentCta(input: {
   hasSavedPaymentMethod: boolean;
-}):
-  | { kind: "confirm_in_chat" }
-  | { kind: "pay_now_checkout" } {
+}): { kind: "confirm_in_chat" } | { kind: "pay_now_checkout" } {
   return input.hasSavedPaymentMethod
     ? { kind: "confirm_in_chat" }
     : { kind: "pay_now_checkout" };
@@ -604,10 +630,12 @@ git commit -m "feat(commerce): enqueue envelopes and tick (MVP)"
 ## Task 4: Seed mocked connections + catalog
 
 **Files:**
+
 - Create: `packages/api/src/commerce/seed.ts`
 - Modify: `packages/api/src/routers/commerce.ts` (add `seed` procedure for dev only)
 
 **Interfaces:**
+
 - Produces: `commerce.seed()` for local demo
 - Consumed by: `/commerce` route (Task 5) to ensure data exists
 
@@ -662,7 +690,11 @@ export async function seedDemoData(ctx: Context): Promise<void> {
 
   await ctx.db.insert(schema.connectionCatalogItems).values([
     {
-      attributesJson: JSON.stringify({ brand: "Golden", sizeKg: 10, stage: "adult" }),
+      attributesJson: JSON.stringify({
+        brand: "Golden",
+        sizeKg: 10,
+        stage: "adult",
+      }),
       connectionId: raiaId,
       createdAt: new Date().toISOString(),
       currency: "BRL",
@@ -725,10 +757,12 @@ git commit -m "feat(commerce): seed mocked connections and catalog"
 ## Task 4.5: Implement MVP commerce state machine (sessions + messages + orders + payments)
 
 **Files:**
+
 - Modify: `packages/api/src/commerce/orchestrator.ts`
 - Modify: `packages/api/src/routers/commerce.ts`
 
 **Interfaces:**
+
 - Produces: real behavior for these envelopes:
   - `user_text` → creates session + user message + assistant carousel
   - `quick_reply(details|buy|pay_now|confirm_payment|swap_card)` → details, purchase summary, checkout start, token charge
@@ -744,12 +778,15 @@ function json(value: unknown): string {
   return JSON.stringify(value);
 }
 
-async function logEvent(ctx: Context, input: {
-  sessionId: string;
-  level: "info" | "warn" | "error";
-  eventType: string;
-  data: unknown;
-}): Promise<void> {
+async function logEvent(
+  ctx: Context,
+  input: {
+    sessionId: string;
+    level: "info" | "warn" | "error";
+    eventType: string;
+    data: unknown;
+  }
+): Promise<void> {
   await ctx.db.insert(schema.executionLogs).values({
     createdAt: new Date().toISOString(),
     dataJson: json(input.data),
@@ -760,13 +797,16 @@ async function logEvent(ctx: Context, input: {
   });
 }
 
-async function addMessage(ctx: Context, input: {
-  userId: string;
-  sessionId: string;
-  role: "user" | "assistant" | "system";
-  type: "text" | "carousel" | "purchase_summary" | "receipt";
-  content: unknown;
-}): Promise<void> {
+async function addMessage(
+  ctx: Context,
+  input: {
+    userId: string;
+    sessionId: string;
+    role: "user" | "assistant" | "system";
+    type: "text" | "carousel" | "purchase_summary" | "receipt";
+    content: unknown;
+  }
+): Promise<void> {
   await ctx.db.insert(schema.messages).values({
     contentJson: json(input.content),
     createdAt: new Date().toISOString(),
@@ -904,7 +944,11 @@ async function processEnvelope(
           subtitle: it.subtitle,
           title: it.title,
           buttons: [
-            { label: "Ver detalhes", action: "details", data: { itemId: it.id } },
+            {
+              label: "Ver detalhes",
+              action: "details",
+              data: { itemId: it.id },
+            },
             { label: "Comprar", action: "buy", data: { itemId: it.id } },
           ],
         })),
@@ -926,7 +970,10 @@ async function processEnvelope(
   }
 
   if (input.type === "quick_reply") {
-    const p = input.payload as { action?: string; data?: Record<string, string> };
+    const p = input.payload as {
+      action?: string;
+      data?: Record<string, string>;
+    };
     const action = p.action ?? "";
     const data = p.data ?? {};
 
@@ -942,7 +989,9 @@ async function processEnvelope(
 
       await addMessage(ctx, {
         content: item
-          ? { text: `**${item.title}**\n${item.subtitle ?? ""}\nPreço: ${formatBrl(item.priceCents)}` }
+          ? {
+              text: `**${item.title}**\n${item.subtitle ?? ""}\nPreço: ${formatBrl(item.priceCents)}`,
+            }
           : { text: "Não encontrei esse item." },
         role: "assistant",
         sessionId,
@@ -999,10 +1048,24 @@ async function processEnvelope(
           buttons:
             cta.kind === "confirm_in_chat"
               ? [
-                  { label: "Confirmar", action: "confirm_payment", data: { orderId } },
-                  { label: "Trocar cartão", action: "swap_card", data: { orderId } },
+                  {
+                    label: "Confirmar",
+                    action: "confirm_payment",
+                    data: { orderId },
+                  },
+                  {
+                    label: "Trocar cartão",
+                    action: "swap_card",
+                    data: { orderId },
+                  },
                 ]
-              : [{ label: "Pagar agora", action: "pay_now", data: { orderId } }],
+              : [
+                  {
+                    label: "Pagar agora",
+                    action: "pay_now",
+                    data: { orderId },
+                  },
+                ],
         },
         role: "assistant",
         sessionId,
@@ -1016,11 +1079,17 @@ async function processEnvelope(
       const orderId = data.orderId ?? "";
       await ctx.db
         .update(schema.orders)
-        .set({ status: "checkout_started", updatedAt: new Date().toISOString() })
+        .set({
+          status: "checkout_started",
+          updatedAt: new Date().toISOString(),
+        })
         .where(eq(schema.orders.id, orderId));
       await ctx.db
         .update(schema.sessions)
-        .set({ status: "checkout_pending", updatedAt: new Date().toISOString() })
+        .set({
+          status: "checkout_pending",
+          updatedAt: new Date().toISOString(),
+        })
         .where(eq(schema.sessions.id, sessionId));
 
       await logEvent(ctx, {
@@ -1184,9 +1253,11 @@ bun dev -F @hackathon/infra
 ```
 
 Then call (via UI later, or by any tRPC client):
+
 - `commerce.sendEnvelope({ type: "user_text", payload: { text: "ração 10kg" } })`
 
 Expected in DB:
+
 - one session row
 - messages include a `carousel` assistant message
 - logs include `session_created` + `envelope_received`
@@ -1203,11 +1274,13 @@ git commit -m "feat(commerce): process envelopes into sessions/messages/orders"
 ## Task 5: Add `/commerce` route (3-panel layout shell) + redirect
 
 **Files:**
+
 - Create: `apps/web/src/routes/_dashboard/commerce/index.tsx`
 - Modify: `apps/web/src/routes/_dashboard/index.tsx`
 - Modify: `apps/web/src/dashboard/nav.ts`
 
 **Interfaces:**
+
 - Consumes: `trpc.commerce.*` procedures
 - Produces: navigable `/commerce`
 
@@ -1287,12 +1360,14 @@ git commit -m "feat(web): add /commerce route shell"
 ## Task 6: Implement “device browser” bottom sheet with indent effect + iframe bridge
 
 **Files:**
+
 - Create: `apps/web/src/commerce/device-browser-sheet.tsx`
 - Create: `apps/web/src/commerce/types.ts`
 - Modify: `apps/web/src/routes/_dashboard/commerce/index.tsx`
 - Create: `apps/web/src/routes/checkout.tsx`
 
 **Interfaces:**
+
 - Produces:
   - `<DeviceBrowserSheet open url onClose onCheckoutReturned />`
   - `/checkout` emits `postMessage({ type: "checkout_returned", payload })`
@@ -1325,7 +1400,8 @@ import { Sheet, SheetContent } from "@hackathon/ui/components/sheet";
 
 import type { CheckoutReturnedMessage } from "./types";
 
-const CHECKOUT_ORIGIN = typeof window !== "undefined" ? window.location.origin : "";
+const CHECKOUT_ORIGIN =
+  typeof window !== "undefined" ? window.location.origin : "";
 
 export function DeviceBrowserSheet(props: {
   open: boolean;
@@ -1350,9 +1426,7 @@ export function DeviceBrowserSheet(props: {
   return (
     <Sheet onOpenChange={(next) => (next ? null : onClose())} open={open}>
       <SheetContent side="bottom" className="h-[85svh] p-0">
-        <div className="border-b px-4 py-3 text-sm font-medium">
-          Browser
-        </div>
+        <div className="border-b px-4 py-3 text-sm font-medium">Browser</div>
         <iframe className="h-full w-full" src={url} title="checkout" />
       </SheetContent>
     </Sheet>
@@ -1511,6 +1585,7 @@ bun dev -F @hackathon/infra
 Open web, go to `/commerce`, click “Open checkout drawer”, click “Voltar para o WhatsApp”.
 
 Expected:
+
 - Drawer opens, background scales slightly
 - Clicking “Voltar” closes drawer
 
@@ -1526,10 +1601,12 @@ git commit -m "feat(web): add device browser checkout drawer"
 ## Task 7: Implement chat panel with carousel + buy flow to summary → confirm/pay-now
 
 **Files:**
+
 - Create: `apps/web/src/commerce/chat-panel.tsx`
 - Modify: `apps/web/src/routes/_dashboard/commerce/index.tsx`
 
 **Interfaces:**
+
 - Consumes:
   - `trpc.commerce.sendEnvelope` (mutation)
   - `trpc.commerce.getMessages` (query)
@@ -1542,7 +1619,11 @@ Create `apps/web/src/commerce/chat-panel.tsx`:
 
 ```tsx
 import { Button } from "@hackathon/ui/components/button";
-import { Bubble, BubbleContent, BubbleGroup } from "@hackathon/ui/components/bubble";
+import {
+  Bubble,
+  BubbleContent,
+  BubbleGroup,
+} from "@hackathon/ui/components/bubble";
 import {
   Message,
   MessageContent,
@@ -1576,7 +1657,9 @@ export function ChatPanel(props: {
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <div className="border-b px-4 py-3 text-sm font-medium">Yuno Commerce</div>
+      <div className="border-b px-4 py-3 text-sm font-medium">
+        Yuno Commerce
+      </div>
       <MessageScrollerProvider>
         <MessageScroller>
           <MessageScrollerViewport>
@@ -1596,7 +1679,9 @@ export function ChatPanel(props: {
                       <Message align={align}>
                         <MessageContent>
                           <BubbleGroup>
-                            <Bubble variant={m.role === "user" ? "tinted" : "muted"}>
+                            <Bubble
+                              variant={m.role === "user" ? "tinted" : "muted"}
+                            >
                               <BubbleContent>
                                 {m.type === "carousel" &&
                                 typeof parsed === "object" &&
@@ -1610,42 +1695,45 @@ export function ChatPanel(props: {
                                         : "Opções"}
                                     </div>
                                     <div className="flex gap-3 overflow-x-auto pb-2 [scroll-snap-type:x_mandatory]">
-                                      {((parsed as any).cards as any[]).map((c) => (
-                                        <div
-                                          key={c.itemId}
-                                          className="w-[240px] shrink-0 scroll-mx-2 rounded border bg-white/60 p-3 [scroll-snap-align:start]"
-                                        >
-                                          <div className="text-xs font-medium">
-                                            {c.title}
+                                      {((parsed as any).cards as any[]).map(
+                                        (c) => (
+                                          <div
+                                            key={c.itemId}
+                                            className="w-[240px] shrink-0 scroll-mx-2 rounded border bg-white/60 p-3 [scroll-snap-align:start]"
+                                          >
+                                            <div className="text-xs font-medium">
+                                              {c.title}
+                                            </div>
+                                            <div className="text-muted-foreground mt-1 text-[11px]">
+                                              {c.connectionName} ·{" "}
+                                              {c.subtitle ?? ""}
+                                            </div>
+                                            <div className="mt-2 text-xs font-semibold">
+                                              {c.price}
+                                            </div>
+                                            <div className="mt-3 flex gap-2">
+                                              {c.buttons.map((b: any) => (
+                                                <button
+                                                  key={b.action}
+                                                  className="rounded border px-2 py-1 text-[11px]"
+                                                  onClick={async () => {
+                                                    await sendEnvelope({
+                                                      type: "quick_reply",
+                                                      payload: {
+                                                        action: b.action,
+                                                        data: b.data,
+                                                      },
+                                                    });
+                                                  }}
+                                                  type="button"
+                                                >
+                                                  {b.label}
+                                                </button>
+                                              ))}
+                                            </div>
                                           </div>
-                                          <div className="text-muted-foreground mt-1 text-[11px]">
-                                            {c.connectionName} · {c.subtitle ?? ""}
-                                          </div>
-                                          <div className="mt-2 text-xs font-semibold">
-                                            {c.price}
-                                          </div>
-                                          <div className="mt-3 flex gap-2">
-                                            {c.buttons.map((b: any) => (
-                                              <button
-                                                key={b.action}
-                                                className="rounded border px-2 py-1 text-[11px]"
-                                                onClick={async () => {
-                                                  await sendEnvelope({
-                                                    type: "quick_reply",
-                                                    payload: {
-                                                      action: b.action,
-                                                      data: b.data,
-                                                    },
-                                                  });
-                                                }}
-                                                type="button"
-                                              >
-                                                {b.label}
-                                              </button>
-                                            ))}
-                                          </div>
-                                        </div>
-                                      ))}
+                                        )
+                                      )}
                                     </div>
                                   </div>
                                 ) : m.type === "purchase_summary" &&
@@ -1660,30 +1748,34 @@ export function ChatPanel(props: {
                                       Total: {(parsed as any).total}
                                     </div>
                                     <div className="mt-3 flex gap-2">
-                                      {((parsed as any).buttons as any[]).map((b) => (
-                                        <button
-                                          key={b.action}
-                                          className="rounded border px-2 py-1 text-[11px]"
-                                          onClick={async () => {
-                                            await sendEnvelope({
-                                              type: "quick_reply",
-                                              payload: {
-                                                action: b.action,
-                                                data: b.data,
-                                              },
-                                            });
-                                            if (
-                                              b.action === "pay_now" ||
-                                              b.action === "swap_card"
-                                            ) {
-                                              onOpenCheckout(b.data.orderId as string);
-                                            }
-                                          }}
-                                          type="button"
-                                        >
-                                          {b.label}
-                                        </button>
-                                      ))}
+                                      {((parsed as any).buttons as any[]).map(
+                                        (b) => (
+                                          <button
+                                            key={b.action}
+                                            className="rounded border px-2 py-1 text-[11px]"
+                                            onClick={async () => {
+                                              await sendEnvelope({
+                                                type: "quick_reply",
+                                                payload: {
+                                                  action: b.action,
+                                                  data: b.data,
+                                                },
+                                              });
+                                              if (
+                                                b.action === "pay_now" ||
+                                                b.action === "swap_card"
+                                              ) {
+                                                onOpenCheckout(
+                                                  b.data.orderId as string
+                                                );
+                                              }
+                                            }}
+                                            type="button"
+                                          >
+                                            {b.label}
+                                          </button>
+                                        )
+                                      )}
                                     </div>
                                   </div>
                                 ) : (
@@ -1732,6 +1824,7 @@ export function ChatPanel(props: {
 - [ ] **Step 2: Wire chat panel into commerce page and reuse DeviceBrowserSheet**
 
 Modify `apps/web/src/routes/_dashboard/commerce/index.tsx`:
+
 - replace the left column with `<ChatPanel ... />`
 - load messages via `trpc.commerce.getMessages`
 - implement `sendEnvelope` via `trpc.commerce.sendEnvelope`
@@ -1763,6 +1856,7 @@ async function send(envelope: { type: string; payload: unknown }) {
 - [ ] **Step 3: Manual verification**
 
 Run dev and confirm:
+
 - sending “ração 10kg” results in an assistant **carousel**
 - clicking “Comprar” on a card creates a **purchase summary** message
 - clicking “Pagar agora” opens `/checkout` in the drawer
@@ -1780,11 +1874,13 @@ git commit -m "feat(web): render chat with carousel and purchase flow"
 ## Task 8: Implement sessions + logs panels and connect to tRPC reads
 
 **Files:**
+
 - Create: `apps/web/src/commerce/sessions-panel.tsx`
 - Create: `apps/web/src/commerce/logs-panel.tsx`
 - Modify: `apps/web/src/routes/_dashboard/commerce/index.tsx`
 
 **Interfaces:**
+
 - Consumes:
   - `trpc.commerce.getSessions` query
   - `trpc.commerce.getLogs` query
@@ -1858,9 +1954,7 @@ export type ExecutionLogRow = {
   createdAt: string;
 };
 
-export function LogsPanel(props: {
-  logs: ExecutionLogRow[];
-}) {
+export function LogsPanel(props: { logs: ExecutionLogRow[] }) {
   const { logs } = props;
   return (
     <div className="flex h-full min-h-0 flex-col">
@@ -1929,4 +2023,3 @@ git commit -m "feat(web): render sessions and execution logs panels"
 - Token wallet: modeled via `payment_methods` (Task 1) and created/updated on `checkout_returned` (Task 4.5).
 - Queue/tick: MVP single-threaded tick loop + envelope processing are in Task 3 + Task 4.5.
 - UI: `/commerce` 3 panels + interactive messages are covered (Tasks 5–8).
-

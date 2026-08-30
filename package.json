@@ -31,7 +31,7 @@
     "build": "turbo run build",
     "check-types": "turbo run check-types",
     "dev:web": "turbo run dev -F web --",
-    "dev:server": "turbo run dev -F server --",
+    "dev:server": "turbo run dev -F @hackathon/infra --",
     "db:generate": "turbo run db:generate -F @hackathon/db --",
     "deploy": "turbo run deploy -F @hackathon/infra --",
     "destroy": "turbo run destroy -F @hackathon/infra --",

@@ -18,8 +18,7 @@
       "persistent": true
     },
     "db:generate": {
-      "cache": false,
-      "interactive": true
+      "cache": false
     },
     "deploy": {
       "cache": false,

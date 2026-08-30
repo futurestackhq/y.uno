@@ -22,6 +22,12 @@ export const server = Cloudflare.Worker("server", {
   env: {
     CORS_ORIGIN: Config.string("CORS_ORIGIN").pipe(Config.withDefault("*")),
     DB: db,
+    OPENAI_API_KEY: Config.string("OPENAI_API_KEY").pipe(
+      Config.withDefault("")
+    ),
+    ORCHESTRATOR_MODEL: Config.string("ORCHESTRATOR_MODEL").pipe(
+      Config.withDefault("gpt-5.6-luna")
+    ),
   },
   main: "../../apps/server/src/index.ts",
   name: "server",
@@ -35,7 +41,7 @@ export default Alchemy.Stack(
     providers: Cloudflare.providers(),
     state: Cloudflare.state(),
   },
-  Effect.gen(function* () {
+  Effect.gen(function* program() {
     const serverWorker = yield* server;
     const webWorker = yield* Cloudflare.Website.Vite("web", {
       assets: {
