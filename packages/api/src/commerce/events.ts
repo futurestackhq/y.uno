@@ -15,7 +15,9 @@ type PlannedExecutionEventType =
   | "job_progress"
   | "job_done"
   | "job_failed"
-  | "session_status_changed";
+  | "session_status_changed"
+  | "host_plan_started"
+  | "host_plan_persisted";
 
 type CommerceExecutionEventType =
   | "buy_missing_catalog_item"

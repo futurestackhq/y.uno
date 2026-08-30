@@ -51,7 +51,6 @@ const isPlanNode = (value: unknown): value is PlanNode => {
     isPlanNodeStatus(node.status)
   );
 };
-
 const normalizeIntent = (intent: string) =>
   intent === "unknown" || intent.length === 0 ? "generic_request" : intent;
 
