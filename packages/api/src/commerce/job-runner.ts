@@ -3,9 +3,15 @@ import { schema } from "@hackathon/db";
 import { and, asc, eq, isNull, lte, or } from "drizzle-orm";
 
 import { logEvent, logProgressLine } from "./events";
-import { runHostPlan } from "./host-agent";
+import { runHostPlan, runHostSynthesis } from "./host-agent";
 import { assembleHostContext } from "./host-context";
-import { persistHostPlan } from "./host-persistence";
+import {
+  canDelegatePlan,
+  getHostPlan,
+  markHostPlanSuperseded,
+  persistHostPlan,
+  persistHostSynthesis,
+} from "./host-persistence";
 import {
   hasComposeReplyMarker,
   hasSourceJobId,
@@ -127,10 +133,13 @@ const enqueueJob = async (
       | "catalog_search"
       | "catalog_details"
       | "create_order"
-      | "prepare_checkout";
+      | "prepare_checkout"
+      | "host_synthesis";
     session: SessionRow;
     sourceJobId: string;
     subagentName: string;
+    planId?: string;
+    nodeId?: string;
   }
 ) => {
   const ts = nowIso();
@@ -148,7 +157,9 @@ const enqueueJob = async (
       )
     );
   const existingJob = existingJobs.find((job) =>
-    hasSourceJobId(job.inputJson, params.sourceJobId)
+    params.planId && params.nodeId
+      ? job.planId === params.planId && job.nodeId === params.nodeId
+      : hasSourceJobId(job.inputJson, params.sourceJobId)
   );
 
   if (existingJob) {
@@ -159,6 +170,8 @@ const enqueueJob = async (
   const promptText = buildDelegationPrompt({
     input,
     kind: params.kind,
+    nodeId: params.nodeId ?? null,
+    planId: params.planId ?? null,
     session: { id: params.session.id, intent: params.session.intent },
   });
 
@@ -448,7 +461,7 @@ const writeAssistantMessage = async (
   });
 };
 
-const materializeReadyPlanNodes = async (
+const materializeDecisionNodes = async (
   db: Db,
   planId: string,
   session: SessionRow,
@@ -502,12 +515,90 @@ const runHostPlanJob = async (db: Db, job: JobRow) => {
     }
     return;
   }
-  await materializeReadyPlanNodes(
+  await materializeDecisionNodes(
     db,
     persisted.planId,
     persisted.session,
     decision
   );
+};
+
+export const materializeReadyPlanNodes = async (db: Db, planId: string) => {
+  const plan = await getHostPlan(db, planId);
+  const session = await getSession(db, plan.sessionId);
+  if (
+    !canDelegatePlan({
+      baseRevision: plan.baseRevision,
+      sessionRevision: session.revision,
+    })
+  ) {
+    await markHostPlanSuperseded(db, plan.id);
+    return { materialized: 0, stale: true };
+  }
+  const jobs = await db
+    .select()
+    .from(schema.jobs)
+    .where(eq(schema.jobs.planId, planId));
+  const done = new Set(
+    jobs.filter((job) => job.status === "done").map((job) => job.nodeId)
+  );
+  const ready = plan.decision.plan.nodes.filter((node) =>
+    node.dependsOn.every((dependency) => done.has(dependency))
+  );
+  const pendingNodes = ready.filter(
+    (node) => !jobs.some((job) => job.nodeId === node.id)
+  );
+  await Promise.all(
+    pendingNodes.map((node) =>
+      enqueueJob(db, {
+        input: {
+          ...node.input,
+          baseRevision: plan.baseRevision,
+          objective: node.objective,
+          planId,
+        },
+        kind: node.kind,
+        nodeId: node.id,
+        planId,
+        session,
+        sourceJobId: planId,
+        subagentName: `host-${node.kind}`,
+      })
+    )
+  );
+  return { materialized: pendingNodes.length, stale: false };
+};
+
+export const scheduleHostSynthesis = async (db: Db, planId: string) => {
+  const plan = await getHostPlan(db, planId);
+  const session = await getSession(db, plan.sessionId);
+  const jobs = await db
+    .select()
+    .from(schema.jobs)
+    .where(eq(schema.jobs.planId, planId));
+  if (
+    !plan.decision.plan.nodes.every((node) =>
+      jobs.some(
+        (job) =>
+          job.nodeId === node.id && ["done", "failed"].includes(job.status)
+      )
+    )
+  ) {
+    return false;
+  }
+  if (jobs.some((job) => job.kind === "host_synthesis")) {
+    return false;
+  }
+  await enqueueJob(db, {
+    input: { baseRevision: plan.baseRevision, planId },
+    kind: "host_synthesis",
+    nodeId: "host_synthesis",
+    planId,
+    session,
+    sourceJobId: planId,
+    subagentName: "host-synthesis",
+  });
+  return true;
 };
 
 const runRankCatalog = async (db: Db, job: JobRow) => {
@@ -575,6 +666,34 @@ const runComposeReply = async (db: Db, job: JobRow) => {
   await completeJob(db, job, result, { session, status: "awaiting_user" });
 };
 
+const runSpecializedPlanNode = async (db: Db, job: JobRow) => {
+  const input = parseJson<Record<string, unknown>>(job.inputJson);
+  const session = await getSession(db, job.sessionId);
+  let result: Record<string, unknown>;
+  if (job.kind === "catalog_search") {
+    const items = await db.select().from(schema.connectionCatalogItems);
+    result = {
+      items: rankCatalogItems(items, String(input.text ?? input.query ?? "")),
+    };
+  } else if (job.kind === "catalog_details") {
+    const [item] = await db
+      .select()
+      .from(schema.connectionCatalogItems)
+      .where(
+        eq(schema.connectionCatalogItems.id, String(input.itemId ?? input.id))
+      )
+      .limit(1);
+    result = { item: item ?? null };
+  } else if (job.kind === "create_order") {
+    result = { input, requiresConfirmation: true, status: "draft" };
+  } else {
+    result = { purchaseSummary: input, status: "awaiting_confirmation" };
+  }
+  await completeJob(db, job, result, { session });
+  await materializeReadyPlanNodes(db, job.planId as string);
+  await scheduleHostSynthesis(db, job.planId as string);
+};
+
 const runJob = async (db: Db, job: JobRow) => {
   await logEvent(db, {
     data: { attempt: job.attempts, jobKind: job.kind },
@@ -585,12 +704,69 @@ const runJob = async (db: Db, job: JobRow) => {
   });
 
   try {
+    if (job.planId) {
+      const plan = await getHostPlan(db, job.planId);
+      const session = await getSession(db, job.sessionId);
+      const input = parseJson<{ baseRevision?: number }>(job.inputJson);
+      if (
+        !canDelegatePlan({
+          baseRevision: input.baseRevision ?? plan.baseRevision,
+          sessionRevision: session.revision,
+        })
+      ) {
+        await completeJob(db, job, { planSuperseded: true });
+        await logEvent(db, {
+          data: { planId: job.planId },
+          eventType: "plan_superseded" as "job_done",
+          jobId: job.id,
+          level: "info",
+          sessionId: job.sessionId,
+        });
+        return;
+      }
+    }
     if (job.kind === "host_plan") {
       await runHostPlanJob(db, job);
     } else if (job.kind === "rank_catalog") {
       await runRankCatalog(db, job);
     } else if (job.kind === "compose_reply") {
       await runComposeReply(db, job);
+    } else if (job.kind === "host_synthesis") {
+      const plan = await getHostPlan(db, job.planId as string);
+      const session = await getSession(db, job.sessionId);
+      const nodeJobs = await db
+        .select()
+        .from(schema.jobs)
+        .where(eq(schema.jobs.planId, plan.id));
+      const envelope = {
+        sessionId: session.id,
+        text: "Synthesize completed plan results",
+        userId: session.userId,
+      } as Envelope;
+      const decision = await runHostSynthesis({
+        context: nodeJobs.map((node) => ({
+          nodeId: node.nodeId,
+          result: node.resultJson,
+        })),
+        db,
+        envelope,
+      });
+      await persistHostSynthesis(db, {
+        decision,
+        jobId: job.id,
+        plan,
+        session,
+      });
+      await completeJob(db, job, decision);
+    } else if (
+      [
+        "catalog_search",
+        "catalog_details",
+        "create_order",
+        "prepare_checkout",
+      ].includes(job.kind)
+    ) {
+      await runSpecializedPlanNode(db, job);
     } else {
       throw new Error(`Unsupported job kind: ${job.kind}`);
     }

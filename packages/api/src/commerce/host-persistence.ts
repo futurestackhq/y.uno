@@ -4,10 +4,32 @@ import { eq } from "drizzle-orm";
 
 import { logEvent } from "./events";
 import { hostPlanDecisionSchema } from "./host-contract";
-import type { HostPlanDecision } from "./host-contract";
+import type { HostPlanDecision, HostSynthesisDecision } from "./host-contract";
 import type { Envelope } from "./types";
 
 export { canDelegatePlan } from "./reset";
+
+export const getHostPlan = async (db: Db, planId: string) => {
+  const [plan] = await db
+    .select()
+    .from(schema.hostPlans)
+    .where(eq(schema.hostPlans.id, planId))
+    .limit(1);
+  if (!plan) {
+    throw new Error(`Host plan not found: ${planId}`);
+  }
+  return {
+    ...plan,
+    decision: hostPlanDecisionSchema.parse(JSON.parse(plan.decisionJson)),
+  };
+};
+
+export const markHostPlanSuperseded = async (db: Db, planId: string) => {
+  await db
+    .update(schema.hostPlans)
+    .set({ status: "superseded", updatedAt: new Date().toISOString() })
+    .where(eq(schema.hostPlans.id, planId));
+};
 
 export interface PersistedHostPlan {
   baseRevision: number;
@@ -136,4 +158,57 @@ export const persistHostPlan = async (
     sessionId,
     sessionRevision,
   };
+};
+
+export const persistHostSynthesis = async (
+  db: Db,
+  input: {
+    decision: HostSynthesisDecision;
+    plan: Awaited<ReturnType<typeof getHostPlan>>;
+    session: typeof schema.sessions.$inferSelect;
+    jobId: string;
+  }
+) => {
+  const { decision } = input;
+  let nextStatus: "done" | "awaiting_user" | "active" = "active";
+  if (decision.nextAction === "complete") {
+    nextStatus = "done";
+  }
+  if (decision.nextAction === "await_user") {
+    nextStatus = "awaiting_user";
+  }
+  const content = {
+    ...decision.assistantMessage.content,
+    synthesisJobId: input.jobId,
+  };
+  const existing = await db
+    .select()
+    .from(schema.messages)
+    .where(eq(schema.messages.sessionId, input.session.id));
+  if (
+    !existing.some((message) =>
+      message.contentJson.includes(`"synthesisJobId":"${input.jobId}"`)
+    )
+  ) {
+    await db.insert(schema.messages).values({
+      contentJson: JSON.stringify(content),
+      createdAt: new Date().toISOString(),
+      id: crypto.randomUUID(),
+      role: "assistant",
+      sessionId: input.session.id,
+      type: decision.assistantMessage.type,
+      userId: input.session.userId,
+    });
+  }
+  await db
+    .update(schema.hostPlans)
+    .set({ status: "completed", updatedAt: new Date().toISOString() })
+    .where(eq(schema.hostPlans.id, input.plan.id));
+  await db
+    .update(schema.sessions)
+    .set({
+      status: nextStatus,
+      updatedAt: new Date().toISOString(),
+    })
+    .where(eq(schema.sessions.id, input.session.id));
 };
