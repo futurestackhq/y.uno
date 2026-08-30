@@ -20,7 +20,7 @@ import { toast } from "sonner";
 
 import type { SendableEnvelope } from "@/commerce/chat-panel";
 import { ChatPanel } from "@/commerce/chat-panel";
-import { DeviceBrowserSheet } from "@/commerce/device-browser-sheet";
+import { CheckoutDrawer } from "@/commerce/checkout-drawer";
 import { SessionInspectorPanel } from "@/commerce/session-inspector-panel";
 import { SubagentsLivePanel } from "@/commerce/subagents-live-panel";
 import { queryClient, trpc } from "@/utils/trpc";
@@ -39,8 +39,8 @@ const refreshCommerceQueries = async () => {
 };
 
 const CommercePage = () => {
-  const [browserOpen, setBrowserOpen] = useState(false);
-  const [checkoutUrl, setCheckoutUrl] = useState("/checkout?orderId=ord_demo");
+  const [checkoutOpen, setCheckoutOpen] = useState(false);
+  const [checkoutOrderId, setCheckoutOrderId] = useState<string | null>(null);
   const [checkoutSessionId, setCheckoutSessionId] = useState<string | null>(
     null
   );
@@ -52,10 +52,10 @@ const CommercePage = () => {
 
   const pageTransform = useMemo(
     () =>
-      browserOpen
+      checkoutOpen
         ? "origin-top transition-transform duration-200 ease-out scale-[0.97] translate-y-1"
         : "origin-top transition-transform duration-200 ease-out",
-    [browserOpen]
+    [checkoutOpen]
   );
 
   const messagesQuery = useQuery(trpc.commerce.getMessages.queryOptions());
@@ -119,7 +119,8 @@ const CommercePage = () => {
         setSelectedSessionId(null);
         setSelectedJobId(null);
         setCheckoutSessionId(null);
-        setBrowserOpen(false);
+        setCheckoutOrderId(null);
+        setCheckoutOpen(false);
         setResetDialogOpen(false);
         await refreshCommerceQueries();
         toast.success("Demo resetado com sucesso.");
@@ -203,15 +204,15 @@ const CommercePage = () => {
                 isWorking={isWorking}
                 onOpenCheckout={(orderId, sessionId) => {
                   setCheckoutSessionId(sessionId);
-                  setCheckoutUrl(`/checkout?orderId=${orderId}`);
-                  setBrowserOpen(true);
+                  setCheckoutOrderId(orderId);
+                  setCheckoutOpen(true);
                 }}
                 onPayWithSavedCard={async (orderId, sessionId) => {
                   const paymentMethod = defaultPaymentMethodQuery.data;
                   if (!paymentMethod) {
                     setCheckoutSessionId(sessionId);
-                    setCheckoutUrl(`/checkout?orderId=${orderId}`);
-                    setBrowserOpen(true);
+                    setCheckoutOrderId(orderId);
+                    setCheckoutOpen(true);
                     return;
                   }
 
@@ -276,31 +277,32 @@ const CommercePage = () => {
         </div>
       </div>
 
-      <DeviceBrowserSheet
-        onCheckoutReturned={async (msg) => {
-          setBrowserOpen(false);
+      <CheckoutDrawer
+        onClose={() => {
+          setCheckoutOpen(false);
+        }}
+        onPaymentComplete={async (payment) => {
           if (!checkoutSessionId) {
             return;
           }
 
           await sendEnvelopeMutation.mutateAsync({
-            brand: msg.brand,
-            last4: msg.last4,
-            orderId: msg.order_id,
+            brand: payment.brand,
+            last4: payment.last4,
+            orderId: payment.orderId,
             sessionId: checkoutSessionId,
-            status: msg.status,
-            token: msg.token,
-            tokenSaved: msg.tokenSaved,
+            status: "paid",
+            token: payment.token,
+            tokenSaved: true,
             type: "checkout_returned",
             userId: "user_marta",
           });
+          setCheckoutOpen(false);
+          setCheckoutOrderId(null);
           await refreshCommerceQueries();
         }}
-        onClose={() => {
-          setBrowserOpen(false);
-        }}
-        open={browserOpen}
-        url={checkoutUrl}
+        open={checkoutOpen}
+        orderId={checkoutOrderId}
       />
       <Dialog onOpenChange={setResetDialogOpen} open={resetDialogOpen}>
         <DialogContent showCloseButton>

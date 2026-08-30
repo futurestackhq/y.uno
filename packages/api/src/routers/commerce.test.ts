@@ -1,11 +1,18 @@
-import { expect, it } from "bun:test";
+import { describe, expect, it } from "bun:test";
 
 import { isOwnedSessionId } from "../commerce/host-context";
 import {
+  calculateCheckoutTotal,
   DEMO_USER_ID,
   parseBoundedJsonOrRaw,
   serializeCurrentHostPlan,
 } from "./commerce";
+
+describe("calculateCheckoutTotal", () => {
+  it("recalculates the order total from unit price and quantity", () => {
+    expect(calculateCheckoutTotal(4990, 3)).toBe(14_970);
+  });
+});
 
 it("serializes the current host plan for the inspector", () => {
   const inspector = {

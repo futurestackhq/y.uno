@@ -1,4 +1,5 @@
 import { schema } from "@hackathon/db";
+import type { Db } from "@hackathon/db";
 import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
 import { z } from "zod";
 
@@ -34,6 +35,11 @@ const messagesInput = z
   });
 const sessionInspectorInput = z.object({ sessionId: z.string() });
 const jobLogsInput = z.object({ jobId: z.string() });
+const checkoutOrderInput = z.object({ orderId: z.string() });
+const checkoutQuantityInput = z.object({
+  orderId: z.string(),
+  quantity: z.number().int().min(1).max(99),
+});
 const pendingWorkInput = z
   .object({ sessionId: z.string().optional(), userId: z.string().optional() })
   .optional()
@@ -43,6 +49,48 @@ const pendingWorkInput = z
 
 const activeJobStatuses = ["queued", "running"] as const;
 const activeMessageQueueStatuses = ["pending", "processing"] as const;
+
+export const calculateCheckoutTotal = (
+  unitPriceCents: number,
+  quantity: number
+) => unitPriceCents * quantity;
+
+const getCheckoutOrder = async (db: Db, orderId: string) =>
+  await db
+    .select({
+      currency: schema.orders.currency,
+      itemId: schema.connectionCatalogItems.id,
+      lineItemId: schema.orderItems.id,
+      merchant: schema.connections.displayName,
+      orderId: schema.orders.id,
+      quantity: schema.orderItems.qty,
+      status: schema.orders.status,
+      subtitle: schema.connectionCatalogItems.subtitle,
+      title: schema.connectionCatalogItems.title,
+      totalCents: schema.orders.totalCents,
+      unitPriceCents: schema.orderItems.unitPriceCents,
+    })
+    .from(schema.orders)
+    .innerJoin(schema.sessions, eq(schema.orders.sessionId, schema.sessions.id))
+    .innerJoin(
+      schema.connections,
+      eq(schema.orders.connectionId, schema.connections.id)
+    )
+    .innerJoin(
+      schema.orderItems,
+      eq(schema.orderItems.orderId, schema.orders.id)
+    )
+    .innerJoin(
+      schema.connectionCatalogItems,
+      eq(schema.orderItems.catalogItemId, schema.connectionCatalogItems.id)
+    )
+    .where(
+      and(
+        eq(schema.orders.id, orderId),
+        eq(schema.sessions.userId, DEMO_USER_ID)
+      )
+    )
+    .limit(2);
 
 export const serializeCurrentHostPlan = (
   plan:
@@ -66,6 +114,24 @@ export const serializeCurrentHostPlan = (
     : null;
 
 export const commerceRouter = router({
+  getCheckoutOrder: publicProcedure
+    .input(checkoutOrderInput)
+    .query(async ({ ctx, input }) => {
+      const items = await getCheckoutOrder(ctx.db, input.orderId);
+      const [order] = items;
+      if (!order) {
+        return null;
+      }
+
+      return {
+        currency: order.currency,
+        items,
+        merchant: order.merchant,
+        orderId: order.orderId,
+        status: order.status,
+        totalCents: order.totalCents,
+      };
+    }),
   getDefaultPaymentMethod: publicProcedure
     .input(userIdInput)
     .query(async ({ ctx }) => {
@@ -328,4 +394,45 @@ export const commerceRouter = router({
       return { ok: true } as const;
     }),
   tick: publicProcedure.mutation(async ({ ctx }) => await tickOnce(ctx.db)),
+  updateCheckoutQuantity: publicProcedure
+    .input(checkoutQuantityInput)
+    .mutation(async ({ ctx, input }) => {
+      const items = await getCheckoutOrder(ctx.db, input.orderId);
+      if (items.length !== 1) {
+        throw new Error("This MVP checkout supports one item per order");
+      }
+
+      const [item] = items;
+      if (!item || item.status !== "draft") {
+        throw new Error("This order can no longer be updated");
+      }
+
+      const totalCents = calculateCheckoutTotal(
+        item.unitPriceCents,
+        input.quantity
+      );
+      await ctx.db.batch([
+        ctx.db
+          .update(schema.orderItems)
+          .set({ lineTotalCents: totalCents, qty: input.quantity })
+          .where(eq(schema.orderItems.id, item.lineItemId)),
+        ctx.db
+          .update(schema.orders)
+          .set({ totalCents, updatedAt: new Date().toISOString() })
+          .where(eq(schema.orders.id, item.orderId)),
+      ]);
+
+      return {
+        currency: item.currency,
+        item: {
+          quantity: input.quantity,
+          subtitle: item.subtitle,
+          title: item.title,
+          unitPriceCents: item.unitPriceCents,
+        },
+        merchant: item.merchant,
+        orderId: item.orderId,
+        totalCents,
+      };
+    }),
 });

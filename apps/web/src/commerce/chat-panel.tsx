@@ -4,6 +4,7 @@ import {
   BubbleGroup,
 } from "@hackathon/ui/components/bubble";
 import { Button } from "@hackathon/ui/components/button";
+import { Card, CardContent } from "@hackathon/ui/components/card";
 import { Input } from "@hackathon/ui/components/input";
 import {
   Message,
@@ -17,6 +18,7 @@ import {
   MessageScrollerProvider,
   MessageScrollerViewport,
 } from "@hackathon/ui/components/message-scroller";
+import { FileCheck2 } from "lucide-react";
 import type { ReactNode } from "react";
 import { useState } from "react";
 
@@ -111,6 +113,18 @@ const getQuickReplyMessage = (value: unknown): string | null => {
     return "Confirmar compra";
   }
   return null;
+};
+
+const isPaidCheckoutReturn = (value: unknown): boolean => {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+
+  const { orderId, status } = value as {
+    orderId?: unknown;
+    status?: unknown;
+  };
+  return typeof orderId === "string" && status === "paid";
 };
 
 const normalizeCtas = (value: unknown): CarouselCard["ctas"] => {
@@ -454,6 +468,8 @@ export const ChatPanel = (props: {
                   } else {
                     const quickReplyMessage =
                       m.role === "user" ? getQuickReplyMessage(parsed) : null;
+                    const checkoutReturn =
+                      m.role === "user" && isPaidCheckoutReturn(parsed);
                     const textValue =
                       quickReplyMessage ??
                       (typeof parsed === "object" &&
@@ -462,7 +478,23 @@ export const ChatPanel = (props: {
                       typeof (parsed as { text?: unknown }).text === "string"
                         ? (parsed as { text: string }).text
                         : JSON.stringify(parsed));
-                    bubbleBody = (
+                    bubbleBody = checkoutReturn ? (
+                      <Card className="bg-primary/10 border-0 shadow-none">
+                        <CardContent className="flex items-center gap-3 p-4">
+                          <div className="bg-background text-primary flex size-10 items-center justify-center rounded-full">
+                            <FileCheck2 aria-hidden="true" />
+                          </div>
+                          <div className="flex flex-col gap-0.5">
+                            <div className="text-base font-medium">
+                              Confirmar
+                            </div>
+                            <div className="text-muted-foreground text-sm">
+                              Response sent
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ) : (
                       <div className="text-sm whitespace-pre-wrap">
                         {textValue}
                       </div>
