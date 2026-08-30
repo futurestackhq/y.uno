@@ -49,6 +49,34 @@ export interface HostContextSnapshot {
   catalogItems: CatalogItemSummary[];
 }
 
+const MAX_PERSISTED_JSON_BYTES = 100_000;
+const MAX_PERSISTED_JSON_DEPTH = 5;
+
+export const parseBoundedJsonOrRaw = (
+  value: string | null,
+  options?: { maxDepth?: number }
+): unknown => {
+  if (!value || value.length > MAX_PERSISTED_JSON_BYTES) {
+    return value ? "[unavailable]" : null;
+  }
+  try {
+    const parsed: unknown = JSON.parse(value);
+    const maxDepth = options?.maxDepth ?? MAX_PERSISTED_JSON_DEPTH;
+    const checkDepth = (item: unknown, depth: number): boolean => {
+      if (depth > maxDepth || !item || typeof item !== "object") {
+        return depth <= maxDepth;
+      }
+      return Object.values(item).every((child) => checkDepth(child, depth + 1));
+    };
+    return checkDepth(parsed, 0) ? parsed : "[unavailable]";
+  } catch {
+    return value;
+  }
+};
+
+export const isOwnedSessionId = (sessionUserId: string, userId: string) =>
+  sessionUserId === userId;
+
 const toSessionSummary = (
   session: typeof schema.sessions.$inferSelect
 ): SessionSummary => ({
@@ -130,7 +158,9 @@ export const assembleHostContext = async (
   const explicitSession = explicitRows[0]
     ? toSessionSummary(explicitRows[0])
     : null;
-  const sessionId = explicitSession?.id ?? candidateRows[0]?.id;
+  const sessionId = requestedSessionId
+    ? explicitSession?.id
+    : candidateRows[0]?.id;
   const [messageRows, jobRows] = await Promise.all([
     sessionId
       ? db
@@ -164,7 +194,7 @@ export const assembleHostContext = async (
     envelope: input.envelope,
     explicitSession,
     recentMessages: messageRows.toReversed().map((message) => ({
-      content: JSON.parse(message.contentJson) as unknown,
+      content: parseBoundedJsonOrRaw(message.contentJson),
       createdAt: message.createdAt,
       id: message.id,
       role: message.role,
@@ -172,9 +202,7 @@ export const assembleHostContext = async (
       type: message.type,
     })),
     recentResults: jobRows.map(({ jobs: job }) => {
-      const result = job.resultJson
-        ? (JSON.parse(job.resultJson) as unknown)
-        : null;
+      const result = parseBoundedJsonOrRaw(job.resultJson);
       return {
         catalogItemIds: extractIds(result, "catalogItemId"),
         finishedAt: job.finishedAt,

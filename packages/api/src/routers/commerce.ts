@@ -2,9 +2,9 @@ import { schema } from "@hackathon/db";
 import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
 import { z } from "zod";
 
+import { parseBoundedJsonOrRaw as parseHostJsonOrRaw } from "../commerce/host-context";
 import {
   enqueueEnvelope,
-  listLogs,
   listMessages,
   listSessions,
   tickOnce,
@@ -14,33 +14,35 @@ import { resetCommerceDemoData } from "../commerce/reset";
 import { envelopeSchema } from "../commerce/types";
 import { publicProcedure, router } from "../index";
 
-const userIdInput = z.object({ userId: z.string().optional() }).optional();
+export { parseBoundedJsonOrRaw } from "../commerce/host-context";
+
+export const DEMO_USER_ID = "user_marta";
+const userIdInput = z
+  .object({ userId: z.string().optional() })
+  .optional()
+  .refine((input) => !input?.userId || input.userId === DEMO_USER_ID, {
+    message: "Only the configured demo user is available",
+  });
 const sessionIdInput = z
   .object({ sessionId: z.string().optional() })
   .optional();
 const messagesInput = z
   .object({ sessionId: z.string().optional(), userId: z.string().optional() })
-  .optional();
+  .optional()
+  .refine((input) => !input?.userId || input.userId === DEMO_USER_ID, {
+    message: "Only the configured demo user is available",
+  });
 const sessionInspectorInput = z.object({ sessionId: z.string() });
 const jobLogsInput = z.object({ jobId: z.string() });
 const pendingWorkInput = z
   .object({ sessionId: z.string().optional(), userId: z.string().optional() })
-  .optional();
+  .optional()
+  .refine((input) => !input?.userId || input.userId === DEMO_USER_ID, {
+    message: "Only the configured demo user is available",
+  });
 
 const activeJobStatuses = ["queued", "running"] as const;
 const activeMessageQueueStatuses = ["pending", "processing"] as const;
-
-const parseJsonOrRaw = (value: string | null): unknown => {
-  if (!value) {
-    return null;
-  }
-
-  try {
-    return JSON.parse(value);
-  } catch {
-    return value;
-  }
-};
 
 export const serializeCurrentHostPlan = (
   plan:
@@ -56,7 +58,7 @@ export const serializeCurrentHostPlan = (
   plan
     ? {
         baseRevision: plan.baseRevision,
-        decision: parseJsonOrRaw(plan.decisionJson),
+        decision: parseHostJsonOrRaw(plan.decisionJson),
         decisionSummary: plan.decisionSummary,
         id: plan.id,
         status: plan.status,
@@ -64,32 +66,60 @@ export const serializeCurrentHostPlan = (
     : null;
 
 export const commerceRouter = router({
-  getJobLogs: publicProcedure
-    .input(jobLogsInput)
-    .query(
-      async ({ ctx, input }) =>
-        await ctx.db
-          .select()
-          .from(schema.executionLogs)
-          .where(eq(schema.executionLogs.jobId, input.jobId))
-          .orderBy(
-            asc(schema.executionLogs.createdAt),
-            asc(schema.executionLogs.id)
+  getJobLogs: publicProcedure.input(jobLogsInput).query(
+    async ({ ctx, input }) =>
+      await ctx.db
+        .select({ log: schema.executionLogs })
+        .from(schema.executionLogs)
+        .innerJoin(
+          schema.sessions,
+          eq(schema.executionLogs.sessionId, schema.sessions.id)
+        )
+        .where(
+          and(
+            eq(schema.executionLogs.jobId, input.jobId),
+            eq(schema.sessions.userId, DEMO_USER_ID)
           )
-          .limit(500)
-    ),
+        )
+        .orderBy(
+          asc(schema.executionLogs.createdAt),
+          asc(schema.executionLogs.id)
+        )
+        .limit(500)
+        .then((rows) => rows.map(({ log }) => log))
+  ),
   getLogs: publicProcedure
     .input(sessionIdInput)
     .query(async ({ ctx, input }) => {
       const sessionId = input?.sessionId;
-      return await listLogs(ctx.db, sessionId);
+      return await ctx.db
+        .select({ log: schema.executionLogs })
+        .from(schema.executionLogs)
+        .innerJoin(
+          schema.sessions,
+          eq(schema.executionLogs.sessionId, schema.sessions.id)
+        )
+        .where(
+          and(
+            eq(schema.sessions.userId, DEMO_USER_ID),
+            sessionId
+              ? eq(schema.executionLogs.sessionId, sessionId)
+              : undefined
+          )
+        )
+        .orderBy(
+          asc(schema.executionLogs.createdAt),
+          asc(schema.executionLogs.id)
+        )
+        .limit(500)
+        .then((rows) => rows.map(({ log }) => log));
     }),
   getMessages: publicProcedure
     .input(messagesInput)
-    .query(async ({ ctx, input }) => {
-      const userId = input?.userId ?? "user_marta";
-      return await listMessages(ctx.db, userId, input?.sessionId);
-    }),
+    .query(
+      async ({ ctx, input }) =>
+        await listMessages(ctx.db, DEMO_USER_ID, input?.sessionId)
+    ),
   getPendingWork: publicProcedure
     .input(pendingWorkInput)
     .query(async ({ ctx, input }) => {
@@ -100,12 +130,19 @@ export const commerceRouter = router({
             status: schema.jobs.status,
           })
           .from(schema.jobs)
+          .innerJoin(
+            schema.sessions,
+            eq(schema.jobs.sessionId, schema.sessions.id)
+          )
           .where(
             and(
               inArray(schema.jobs.status, activeJobStatuses),
               input?.sessionId
-                ? eq(schema.jobs.sessionId, input.sessionId)
-                : sql`1=1`
+                ? and(
+                    eq(schema.jobs.sessionId, input.sessionId),
+                    eq(schema.sessions.userId, DEMO_USER_ID)
+                  )
+                : eq(schema.sessions.userId, DEMO_USER_ID)
             )
           )
           .groupBy(schema.jobs.status),
@@ -129,9 +166,7 @@ export const commerceRouter = router({
             .where(
               and(
                 inArray(schema.messageQueue.status, activeMessageQueueStatuses),
-                queueUserId
-                  ? eq(schema.messageQueue.userId, queueUserId)
-                  : sql`1=1`
+                eq(schema.messageQueue.userId, DEMO_USER_ID)
               )
             )
             .groupBy(schema.messageQueue.status);
@@ -179,7 +214,12 @@ export const commerceRouter = router({
       const [session] = await ctx.db
         .select()
         .from(schema.sessions)
-        .where(eq(schema.sessions.id, input.sessionId))
+        .where(
+          and(
+            eq(schema.sessions.id, input.sessionId),
+            eq(schema.sessions.userId, DEMO_USER_ID)
+          )
+        )
         .limit(1);
 
       if (!session) {
@@ -201,7 +241,16 @@ export const commerceRouter = router({
           subagentName: schema.jobs.subagentName,
         })
         .from(schema.jobs)
-        .where(eq(schema.jobs.sessionId, input.sessionId))
+        .innerJoin(
+          schema.sessions,
+          eq(schema.jobs.sessionId, schema.sessions.id)
+        )
+        .where(
+          and(
+            eq(schema.jobs.sessionId, input.sessionId),
+            eq(schema.sessions.userId, DEMO_USER_ID)
+          )
+        )
         .orderBy(asc(schema.jobs.createdAt), asc(schema.jobs.id));
       const [latestPlan] = await ctx.db
         .select({
@@ -236,19 +285,16 @@ export const commerceRouter = router({
         jobs: jobs.map((job) => ({
           ...job,
           error: job.errorText,
-          input: parseJsonOrRaw(job.inputJson),
-          result: parseJsonOrRaw(job.resultJson),
+          input: parseHostJsonOrRaw(job.inputJson),
+          result: parseHostJsonOrRaw(job.resultJson),
         })),
-        plan: parseJsonOrRaw(session.planJson),
+        plan: parseHostJsonOrRaw(session.planJson),
         session,
       } as const;
     }),
   getSessions: publicProcedure
     .input(userIdInput)
-    .query(async ({ ctx, input }) => {
-      const userId = input?.userId ?? "user_marta";
-      return await listSessions(ctx.db, userId);
-    }),
+    .query(async ({ ctx }) => await listSessions(ctx.db, DEMO_USER_ID)),
   resetDemoData: publicProcedure.mutation(
     async ({ ctx }) => await resetCommerceDemoData(ctx.db)
   ),
