@@ -1,6 +1,11 @@
 import { describe, expect, it } from "bun:test";
 
-import { classifyIntentFromText, rankCatalogItems } from "./job-runner-helpers";
+import {
+  classifyIntentFromText,
+  hasComposeReplyMarker,
+  hasSourceJobId,
+  rankCatalogItems,
+} from "./job-runner-helpers";
 
 describe("classifyIntentFromText", () => {
   it("detects pet food intent from product text", () => {
@@ -64,5 +69,31 @@ describe("rankCatalogItems", () => {
     );
 
     expect(ranked.map((item) => item.id)).toEqual(["food", "toy"]);
+  });
+});
+
+describe("hasSourceJobId", () => {
+  it("matches jobs linked to the source job", () => {
+    expect(hasSourceJobId('{"sourceJobId":"job_1"}', "job_1")).toBe(true);
+    expect(hasSourceJobId('{"sourceJobId":"job_2"}', "job_1")).toBe(false);
+  });
+
+  it("treats invalid job input as no match", () => {
+    expect(hasSourceJobId("not json", "job_1")).toBe(false);
+  });
+});
+
+describe("hasComposeReplyMarker", () => {
+  it("matches assistant messages linked to the compose job", () => {
+    expect(
+      hasComposeReplyMarker('{"text":"ok","composeJobId":"job_1"}', "job_1")
+    ).toBe(true);
+    expect(
+      hasComposeReplyMarker('{"text":"ok","composeJobId":"job_2"}', "job_1")
+    ).toBe(false);
+  });
+
+  it("treats invalid message content as no match", () => {
+    expect(hasComposeReplyMarker("not json", "job_1")).toBe(false);
   });
 });

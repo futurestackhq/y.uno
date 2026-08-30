@@ -3,7 +3,7 @@ import { schema } from "@hackathon/db";
 import { and, desc, eq } from "drizzle-orm";
 
 import { logEvent } from "./events";
-import type { SessionPlan } from "./plan";
+import type { PlanNodeStatus, SessionPlan } from "./plan";
 import { buildPlan } from "./plan";
 import { buildDelegationPrompt } from "./prompts";
 import { isSmallTalk } from "./small-talk";
@@ -17,11 +17,12 @@ const markPlanNodeQueued = (
   params: { jobId: string; nodeId: string; now: string }
 ): string => {
   const plan = JSON.parse(planJson) as SessionPlan;
+  const status: PlanNodeStatus = "ready";
   return JSON.stringify({
     ...plan,
     nodes: plan.nodes.map((node) =>
       node.id === params.nodeId
-        ? { ...node, jobId: params.jobId, status: "running" as const }
+        ? { ...node, jobId: params.jobId, status }
         : node
     ),
     updatedAt: params.now,

@@ -3,7 +3,12 @@ import { schema } from "@hackathon/db";
 import { and, asc, eq, isNull, lte, or } from "drizzle-orm";
 
 import { logEvent, logProgressLine } from "./events";
-import { classifyIntentFromText, rankCatalogItems } from "./job-runner-helpers";
+import {
+  classifyIntentFromText,
+  hasComposeReplyMarker,
+  hasSourceJobId,
+  rankCatalogItems,
+} from "./job-runner-helpers";
 import type { RankedItem } from "./job-runner-helpers";
 import type { PlanNodeStatus, SessionPlan } from "./plan";
 import { buildDelegationPrompt } from "./prompts";
@@ -23,6 +28,7 @@ interface ClassifyIntentInput {
 
 interface RankCatalogInput {
   sessionId: string;
+  sourceJobId?: string;
   text: string;
   userId: string;
   intent: string;
@@ -118,13 +124,35 @@ const enqueueJob = async (
     input: unknown;
     kind: "rank_catalog" | "compose_reply";
     session: SessionRow;
+    sourceJobId: string;
     subagentName: string;
   }
 ) => {
   const ts = nowIso();
+  const input = {
+    ...(params.input as object),
+    sourceJobId: params.sourceJobId,
+  };
+  const existingJobs = await db
+    .select()
+    .from(schema.jobs)
+    .where(
+      and(
+        eq(schema.jobs.sessionId, params.session.id),
+        eq(schema.jobs.kind, params.kind)
+      )
+    );
+  const existingJob = existingJobs.find((job) =>
+    hasSourceJobId(job.inputJson, params.sourceJobId)
+  );
+
+  if (existingJob) {
+    return existingJob.id;
+  }
+
   const jobId = crypto.randomUUID();
   const promptText = buildDelegationPrompt({
-    input: params.input,
+    input,
     kind: params.kind,
     session: { id: params.session.id, intent: params.session.intent },
   });
@@ -135,7 +163,7 @@ const enqueueJob = async (
     errorText: null,
     finishedAt: null,
     id: jobId,
-    inputJson: JSON.stringify(params.input),
+    inputJson: JSON.stringify(input),
     kind: params.kind,
     leaseExpiresAt: null,
     nextRunAt: ts,
@@ -155,7 +183,7 @@ const enqueueJob = async (
         jobId,
         nodeId: params.kind,
         now: ts,
-        status: "running",
+        status: "ready",
       }),
       updatedAt: ts,
     })
@@ -178,6 +206,23 @@ const enqueueJob = async (
   });
 
   return jobId;
+};
+
+const markJobPlanNodeRunning = async (db: Db, job: JobRow) => {
+  const session = await getSession(db, job.sessionId);
+  const ts = nowIso();
+  await db
+    .update(schema.sessions)
+    .set({
+      planJson: updatePlanNode(session.planJson, {
+        jobId: job.id,
+        nodeId: job.kind,
+        now: ts,
+        status: "running",
+      }),
+      updatedAt: ts,
+    })
+    .where(eq(schema.sessions.id, job.sessionId));
 };
 
 const claimNextJob = async (db: Db): Promise<JobRow | null> => {
@@ -235,7 +280,13 @@ const claimNextJob = async (db: Db): Promise<JobRow | null> => {
     .where(eq(schema.jobs.id, queued.id))
     .limit(1);
 
-  return claimed ?? null;
+  if (!claimed) {
+    return null;
+  }
+
+  await markJobPlanNodeRunning(db, claimed);
+
+  return claimed;
 };
 
 const completeJob = async (
@@ -303,6 +354,22 @@ const failJob = async (db: Db, job: JobRow, error: unknown) => {
       updatedAt: ts.toISOString(),
     })
     .where(eq(schema.jobs.id, job.id));
+
+  if (shouldRetry) {
+    const session = await getSession(db, job.sessionId);
+    await db
+      .update(schema.sessions)
+      .set({
+        planJson: updatePlanNode(session.planJson, {
+          jobId: job.id,
+          nodeId: job.kind,
+          now: ts.toISOString(),
+          status: "ready",
+        }),
+        updatedAt: ts.toISOString(),
+      })
+      .where(eq(schema.sessions.id, job.sessionId));
+  }
 
   if (!shouldRetry) {
     const session = await getSession(db, job.sessionId);
@@ -388,6 +455,7 @@ const runClassifyIntent = async (db: Db, job: JobRow) => {
     input: { ...input, intent: result.intent },
     kind: "rank_catalog",
     session: updatedSession,
+    sourceJobId: job.id,
     subagentName: "catalog-ranker",
   });
 };
@@ -414,6 +482,7 @@ const runRankCatalog = async (db: Db, job: JobRow) => {
     input: { ...input, rankedItems: result.items },
     kind: "compose_reply",
     session: updatedSession,
+    sourceJobId: job.id,
     subagentName: "reply-composer",
   });
 };
@@ -428,16 +497,30 @@ const runComposeReply = async (db: Db, job: JobRow) => {
 
   const result = buildReply(input);
   const session = await getSession(db, job.sessionId);
+  const existingMessages = await db
+    .select()
+    .from(schema.messages)
+    .where(
+      and(
+        eq(schema.messages.sessionId, job.sessionId),
+        eq(schema.messages.role, "assistant")
+      )
+    );
+  const existingMessage = existingMessages.find((message) =>
+    hasComposeReplyMarker(message.contentJson, job.id)
+  );
 
-  await db.insert(schema.messages).values({
-    contentJson: JSON.stringify(result.message),
-    createdAt: nowIso(),
-    id: crypto.randomUUID(),
-    role: "assistant",
-    sessionId: job.sessionId,
-    type: result.type,
-    userId: input.userId,
-  });
+  if (!existingMessage) {
+    await db.insert(schema.messages).values({
+      contentJson: JSON.stringify({ ...result.message, composeJobId: job.id }),
+      createdAt: nowIso(),
+      id: crypto.randomUUID(),
+      role: "assistant",
+      sessionId: job.sessionId,
+      type: result.type,
+      userId: input.userId,
+    });
+  }
 
   await completeJob(db, job, result, { session, status: "awaiting_user" });
 };

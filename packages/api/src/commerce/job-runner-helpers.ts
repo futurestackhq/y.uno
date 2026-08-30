@@ -27,6 +27,30 @@ export interface RankedItem {
   score: number;
 }
 
+export const hasSourceJobId = (
+  inputJson: string,
+  sourceJobId: string
+): boolean => {
+  try {
+    const input = JSON.parse(inputJson) as { sourceJobId?: unknown };
+    return input.sourceJobId === sourceJobId;
+  } catch {
+    return false;
+  }
+};
+
+export const hasComposeReplyMarker = (
+  contentJson: string,
+  composeJobId: string
+): boolean => {
+  try {
+    const content = JSON.parse(contentJson) as { composeJobId?: unknown };
+    return content.composeJobId === composeJobId;
+  } catch {
+    return false;
+  }
+};
+
 const normalizeTerms = (text: string): string[] =>
   text
     .toLowerCase()
