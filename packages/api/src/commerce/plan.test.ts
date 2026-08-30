@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 
-import { buildPlan } from "./plan";
+import { buildPlan, normalizePlanJson } from "./plan";
 
 describe("buildPlan", () => {
   it("creates a 3-node linear DAG with stable ids", () => {
@@ -41,5 +41,58 @@ describe("buildPlan", () => {
 
     expect(genericRank?.status).toBe("blocked");
     expect(productRank?.status).toBe("pending");
+  });
+});
+
+describe("normalizePlanJson", () => {
+  it("repairs legacy empty plans using the session intent", () => {
+    const plan = normalizePlanJson("{}", "unknown");
+
+    expect(plan.nodes.map((node) => node.id)).toEqual([
+      "classify_intent",
+      "rank_catalog",
+      "compose_reply",
+    ]);
+    expect(plan.nodes.find((node) => node.id === "rank_catalog")?.status).toBe(
+      "blocked"
+    );
+  });
+
+  it("repairs invalid JSON without discarding a valid intent fallback", () => {
+    const plan = normalizePlanJson("not json", "product_pet_food");
+
+    expect(plan.version).toBe(1);
+    expect(plan.nodes.find((node) => node.id === "rank_catalog")?.status).toBe(
+      "pending"
+    );
+  });
+
+  it("preserves valid custom plan nodes while restoring missing workflow nodes", () => {
+    const plan = normalizePlanJson(
+      JSON.stringify({
+        createdAt: "2026-08-29T00:00:00.000Z",
+        nodes: [
+          {
+            deps: [],
+            id: "custom_step",
+            kind: "custom_step",
+            status: "done",
+          },
+        ],
+        updatedAt: "2026-08-29T00:00:00.000Z",
+        version: 1,
+      }),
+      "product_pet_food"
+    );
+
+    expect(plan.nodes.find((node) => node.id === "custom_step")?.status).toBe(
+      "done"
+    );
+    expect(plan.nodes.map((node) => node.id)).toEqual([
+      "classify_intent",
+      "rank_catalog",
+      "compose_reply",
+      "custom_step",
+    ]);
   });
 });

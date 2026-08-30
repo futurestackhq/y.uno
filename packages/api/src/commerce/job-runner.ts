@@ -10,7 +10,8 @@ import {
   rankCatalogItems,
 } from "./job-runner-helpers";
 import type { RankedItem } from "./job-runner-helpers";
-import type { PlanNodeStatus, SessionPlan } from "./plan";
+import type { PlanNodeStatus } from "./plan";
+import { normalizePlanJson } from "./plan";
 import { buildDelegationPrompt } from "./prompts";
 
 const LEASE_MS = 60_000;
@@ -82,13 +83,14 @@ const buildReply = (input: ComposeReplyInput): ComposeReplyResult => {
 const updatePlanNode = (
   planJson: string,
   params: {
+    intent: string;
     jobId?: string;
     nodeId: string;
     now: string;
     status: PlanNodeStatus;
   }
 ): string => {
-  const plan = parseJson<SessionPlan>(planJson);
+  const plan = normalizePlanJson(planJson, params.intent);
   return JSON.stringify({
     ...plan,
     nodes: plan.nodes.map((node) =>
@@ -180,6 +182,7 @@ const enqueueJob = async (
     .update(schema.sessions)
     .set({
       planJson: updatePlanNode(params.session.planJson, {
+        intent: params.session.intent,
         jobId,
         nodeId: params.kind,
         now: ts,
@@ -215,6 +218,7 @@ const markJobPlanNodeRunning = async (db: Db, job: JobRow) => {
     .update(schema.sessions)
     .set({
       planJson: updatePlanNode(session.planJson, {
+        intent: session.intent,
         jobId: job.id,
         nodeId: job.kind,
         now: ts,
@@ -284,7 +288,29 @@ const claimNextJob = async (db: Db): Promise<JobRow | null> => {
     return null;
   }
 
-  await markJobPlanNodeRunning(db, claimed);
+  try {
+    await markJobPlanNodeRunning(db, claimed);
+  } catch (error) {
+    const recoveryTime = new Date();
+    const shouldRetry = claimed.attempts < MAX_ATTEMPTS;
+    await db
+      .update(schema.jobs)
+      .set({
+        errorText: error instanceof Error ? error.message : "unknown_error",
+        finishedAt: shouldRetry ? null : recoveryTime.toISOString(),
+        leaseExpiresAt: null,
+        nextRunAt: shouldRetry
+          ? addMs(
+              recoveryTime,
+              BACKOFF_MS[Math.max(0, claimed.attempts - 1)] ?? BACKOFF_MS.at(-1)
+            )
+          : null,
+        status: shouldRetry ? "queued" : "failed",
+        updatedAt: recoveryTime.toISOString(),
+      })
+      .where(eq(schema.jobs.id, claimed.id));
+    return null;
+  }
 
   return claimed;
 };
@@ -314,6 +340,7 @@ const completeJob = async (
       .update(schema.sessions)
       .set({
         planJson: updatePlanNode(params.session.planJson, {
+          intent: params.session.intent,
           jobId: job.id,
           nodeId: job.kind,
           now: ts,
@@ -361,6 +388,7 @@ const failJob = async (db: Db, job: JobRow, error: unknown) => {
       .update(schema.sessions)
       .set({
         planJson: updatePlanNode(session.planJson, {
+          intent: session.intent,
           jobId: job.id,
           nodeId: job.kind,
           now: ts.toISOString(),
@@ -377,6 +405,7 @@ const failJob = async (db: Db, job: JobRow, error: unknown) => {
       .update(schema.sessions)
       .set({
         planJson: updatePlanNode(session.planJson, {
+          intent: session.intent,
           jobId: job.id,
           nodeId: job.kind,
           now: ts.toISOString(),
@@ -409,6 +438,7 @@ const runClassifyIntent = async (db: Db, job: JobRow) => {
   const session = await getSession(db, job.sessionId);
   const ts = nowIso();
   const nextPlan = updatePlanNode(session.planJson, {
+    intent: session.intent,
     jobId: job.id,
     nodeId: "classify_intent",
     now: ts,

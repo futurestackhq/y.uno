@@ -3,8 +3,8 @@ import { schema } from "@hackathon/db";
 import { and, desc, eq } from "drizzle-orm";
 
 import { logEvent } from "./events";
-import type { PlanNodeStatus, SessionPlan } from "./plan";
-import { buildPlan } from "./plan";
+import type { PlanNodeStatus } from "./plan";
+import { buildPlan, normalizePlanJson } from "./plan";
 import { buildDelegationPrompt } from "./prompts";
 import { isSmallTalk } from "./small-talk";
 import { envelopeSchema } from "./types";
@@ -14,9 +14,9 @@ const nowIso = () => new Date().toISOString();
 
 const markPlanNodeQueued = (
   planJson: string,
-  params: { jobId: string; nodeId: string; now: string }
+  params: { intent: string; jobId: string; nodeId: string; now: string }
 ): string => {
-  const plan = JSON.parse(planJson) as SessionPlan;
+  const plan = normalizePlanJson(planJson, params.intent);
   const status: PlanNodeStatus = "ready";
   return JSON.stringify({
     ...plan,
@@ -86,7 +86,23 @@ const ensureSession = async (
     : await getLatestSession(db, params.userId);
 
   if (existing) {
-    return existing;
+    const normalizedPlan = normalizePlanJson(
+      existing.planJson,
+      existing.intent
+    );
+    const normalizedPlanJson = JSON.stringify(normalizedPlan);
+
+    if (normalizedPlanJson === existing.planJson) {
+      return existing;
+    }
+
+    const updatedAt = nowIso();
+    await db
+      .update(schema.sessions)
+      .set({ planJson: normalizedPlanJson, updatedAt })
+      .where(eq(schema.sessions.id, existing.id));
+
+    return { ...existing, planJson: normalizedPlanJson, updatedAt };
   }
 
   const sessionId = params.requestedSessionId ?? crypto.randomUUID();
@@ -131,16 +147,13 @@ const handleUserText = async (
   meta: { messageQueueId: string }
 ) => {
   const text = envelope.text.trim();
-  const session =
-    (await ensureSession(db, {
-      requestedSessionId: envelope.sessionId,
-      userId: envelope.userId,
-    })) ??
-    // If something went wrong when creating the session, fall back to a stable id for logs.
-    ({
-      id: envelope.sessionId ?? crypto.randomUUID(),
-      intent: "unknown",
-    } as const);
+  const session = await ensureSession(db, {
+    requestedSessionId: envelope.sessionId,
+    userId: envelope.userId,
+  });
+  if (!session) {
+    throw new Error("Failed to create commerce session");
+  }
 
   await logEvent(db, {
     data: {
@@ -207,6 +220,7 @@ const handleUserText = async (
     .update(schema.sessions)
     .set({
       planJson: markPlanNodeQueued(session.planJson, {
+        intent: session.intent,
         jobId,
         nodeId: "classify_intent",
         now: planUpdatedAt,
