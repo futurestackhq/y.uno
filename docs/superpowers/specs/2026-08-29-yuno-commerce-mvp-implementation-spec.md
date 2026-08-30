@@ -141,6 +141,7 @@ Panel 3 timeline.
 - `id` (pk)
 - `session_id`
 - `connection_id`
+- `payment_method_id` (fk, nullable; set when charging)
 - `status` (`draft` | `checkout_started` | `paid` | `failed` | `fulfilled`)
 - `total_cents`
 - `currency`
@@ -232,14 +233,23 @@ When user clicks **Comprar**:
   - success/failure screen
   - button “Voltar para o WhatsApp”
 - “Voltar para o WhatsApp” triggers `checkout_returned` envelope.
+- If `tokenSaved=true`, the orchestrator must **create or update** a `payment_methods` row for the user:
+  - set `is_default=true`
+  - persist `brand`/`last4` for UX
+  - persist a mocked `token` string (represents the tokenized PAN stored by Yuno)
 
 ### 5.3 Recurring purchase (in-chat)
 - user clicks **Confirmar**
 - orchestrator enqueues `charge_token` job (mock)
 - on success:
   - mark order `paid`
+  - set `orders.payment_method_id` to the default saved `payment_methods.id`
   - send receipt message
   - session → `done`
+
+If the user clicks **Trocar cartão** (`swap_card` envelope):
+- always open `/checkout?orderId=...` (drawer) as fallback to re-collect and re-tokenize
+- on success, update the default `payment_methods` and re-attempt `confirm_payment`
 
 ### 5.4 Token reuse across connections
 MVP rule: one saved token can be used across all connections (wallet model).
