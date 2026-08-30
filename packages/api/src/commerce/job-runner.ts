@@ -302,7 +302,9 @@ const claimNextJob = async (db: Db): Promise<JobRow | null> => {
         nextRunAt: shouldRetry
           ? addMs(
               recoveryTime,
-              BACKOFF_MS[Math.max(0, claimed.attempts - 1)] ?? BACKOFF_MS.at(-1)
+              BACKOFF_MS[Math.max(0, claimed.attempts - 1)] ??
+                BACKOFF_MS.at(-1) ??
+                0
             )
           : null,
         status: shouldRetry ? "queued" : "failed",
@@ -367,7 +369,7 @@ const failJob = async (db: Db, job: JobRow, error: unknown) => {
   const retryIndex = Math.max(0, job.attempts - 1);
   const shouldRetry = job.attempts < MAX_ATTEMPTS;
   const nextRunAt = shouldRetry
-    ? addMs(ts, BACKOFF_MS[retryIndex] ?? BACKOFF_MS.at(-1))
+    ? addMs(ts, BACKOFF_MS[retryIndex] ?? BACKOFF_MS.at(-1) ?? 0)
     : null;
 
   await db
