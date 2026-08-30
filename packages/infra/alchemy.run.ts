@@ -35,7 +35,7 @@ export default Alchemy.Stack(
     providers: Cloudflare.providers(),
     state: Cloudflare.state(),
   },
-  Effect.gen(function* () {
+  Effect.gen(function* program() {
     const serverWorker = yield* server;
     const webWorker = yield* Cloudflare.Website.Vite("web", {
       assets: {
