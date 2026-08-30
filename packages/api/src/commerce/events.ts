@@ -44,7 +44,7 @@ export const logEvent = async (db: Db, event: ExecutionEvent) => {
     id: crypto.randomUUID(),
     jobId: event.jobId,
     level: event.level,
-    line: event.line ? event.line.slice(0, 1000) : undefined,
+    line: event.line?.slice(0, 1000),
     sessionId: event.sessionId,
   });
 };
@@ -58,7 +58,7 @@ export const logProgressLine = async (
     eventType: "job_progress",
     jobId: params.jobId,
     level: "info",
-    line: params.line,
+    line: params.line.slice(0, 1000),
     sessionId: params.sessionId,
   });
 };
