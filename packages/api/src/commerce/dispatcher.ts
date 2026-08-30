@@ -3,6 +3,7 @@ import { schema } from "@hackathon/db";
 import { and, desc, eq } from "drizzle-orm";
 
 import { logEvent } from "./events";
+import type { SessionPlan } from "./plan";
 import { buildPlan } from "./plan";
 import { buildDelegationPrompt } from "./prompts";
 import { isSmallTalk } from "./small-talk";
@@ -10,6 +11,22 @@ import { envelopeSchema } from "./types";
 import type { Envelope } from "./types";
 
 const nowIso = () => new Date().toISOString();
+
+const markPlanNodeQueued = (
+  planJson: string,
+  params: { jobId: string; nodeId: string; now: string }
+): string => {
+  const plan = JSON.parse(planJson) as SessionPlan;
+  return JSON.stringify({
+    ...plan,
+    nodes: plan.nodes.map((node) =>
+      node.id === params.nodeId
+        ? { ...node, jobId: params.jobId, status: "running" as const }
+        : node
+    ),
+    updatedAt: params.now,
+  });
+};
 
 const addMessage = async (
   db: Db,
@@ -184,6 +201,27 @@ const handleUserText = async (
     updatedAt: nowIso(),
   });
 
+  const planUpdatedAt = nowIso();
+  await db
+    .update(schema.sessions)
+    .set({
+      planJson: markPlanNodeQueued(session.planJson, {
+        jobId,
+        nodeId: "classify_intent",
+        now: planUpdatedAt,
+      }),
+      updatedAt: planUpdatedAt,
+    })
+    .where(eq(schema.sessions.id, session.id));
+
+  await logEvent(db, {
+    data: { jobId, nodeId: "classify_intent" },
+    eventType: "plan_updated",
+    jobId,
+    level: "info",
+    sessionId: session.id,
+  });
+
   await logEvent(db, {
     data: {
       jobKind: "classify_intent",
@@ -283,7 +321,7 @@ export const dispatchOnce = async (db: Db) => {
     return { processed: 0 } as const;
   }
 
-  await db
+  const claimResult = await db
     .update(schema.messageQueue)
     .set({ status: "processing" })
     .where(
@@ -292,6 +330,10 @@ export const dispatchOnce = async (db: Db) => {
         eq(schema.messageQueue.status, "pending")
       )
     );
+
+  if (claimResult.meta.changes === 0) {
+    return { processed: 0 } as const;
+  }
 
   const [claimed] = await db
     .select()

@@ -3,6 +3,7 @@ import { schema } from "@hackathon/db";
 import { and, desc, eq, sql } from "drizzle-orm";
 
 import { dispatchOnce } from "./dispatcher";
+import { runJobsOnce } from "./job-runner";
 import { seedDemoData } from "./seed";
 import type { Envelope } from "./types";
 
@@ -26,23 +27,31 @@ const ensureUser = async (db: Db, userId: string) => {
   });
 };
 
+const toIdempotencyKey = (envelope: Envelope): string => {
+  if (envelope.idempotencyKey) {
+    return envelope.idempotencyKey;
+  }
+
+  return `${envelope.type}:${JSON.stringify(envelope)}`;
+};
+
 export const enqueueEnvelope = async (db: Db, envelope: Envelope) => {
   await seedDemoData(db);
   await ensureUser(db, envelope.userId);
 
-  await db.insert(schema.messageQueue).values({
-    id: crypto.randomUUID(),
-    payloadJson: JSON.stringify(envelope),
-    receivedAt: nowIso(),
-    status: "pending",
-    type: envelope.type,
-    userId: envelope.userId,
-  });
+  await db
+    .insert(schema.messageQueue)
+    .values({
+      id: crypto.randomUUID(),
+      idempotencyKey: toIdempotencyKey(envelope),
+      payloadJson: JSON.stringify(envelope),
+      receivedAt: nowIso(),
+      status: "pending",
+      type: envelope.type,
+      userId: envelope.userId,
+    })
+    .onConflictDoNothing();
 };
-
-const runJobsOnce = (_db: Db, _params: { limit: number }) =>
-  // Task 7 will implement this runner.
-  ({ processed: 0 }) as const;
 
 export const tickOnce = async (db: Db) => {
   const dispatched = await dispatchOnce(db);
@@ -50,7 +59,7 @@ export const tickOnce = async (db: Db) => {
 
   return {
     ok: true,
-    processed: dispatched.processed + ran.processed,
+    processed: dispatched.processed + ran.ran,
   } as const;
 };
 

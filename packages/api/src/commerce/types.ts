@@ -21,6 +21,7 @@ export type QuickReplyAction = z.infer<typeof quickReplyActionSchema>;
 
 export const envelopeSchema = z.discriminatedUnion("type", [
   z.object({
+    idempotencyKey: z.string().optional(),
     // If present, we treat as a follow-up in that session.
     sessionId: z.string().optional(),
     text: z.string().min(1),
@@ -30,6 +31,7 @@ export const envelopeSchema = z.discriminatedUnion("type", [
   z.object({
     action: quickReplyActionSchema,
     catalogItemId: z.string().optional(),
+    idempotencyKey: z.string().optional(),
     orderId: z.string().optional(),
     sessionId: z.string(),
     type: z.literal("quick_reply"),
@@ -37,6 +39,7 @@ export const envelopeSchema = z.discriminatedUnion("type", [
   }),
   z.object({
     brand: z.string().optional(),
+    idempotencyKey: z.string().optional(),
     last4: z.string().optional(),
     orderId: z.string(),
     sessionId: z.string(),
