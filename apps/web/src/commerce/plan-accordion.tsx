@@ -54,7 +54,7 @@ export const PlanAccordion = (props: { plan: unknown; status?: string }) => {
     <Task className="rounded border" defaultOpen={false}>
       <TaskTrigger
         className="px-3 py-2"
-        title={`${props.status === "superseded" ? "Plano substituído · " : ""}Plan · nodes ${props.plan.nodes.length} · ready ${counts.ready} · blocked ${counts.blocked} · running ${counts.running} · failed ${counts.failed}`}
+        title={`${props.status === "superseded" ? "Superseded plan · " : ""}Plan · nodes ${props.plan.nodes.length} · ready ${counts.ready} · blocked ${counts.blocked} · running ${counts.running} · failed ${counts.failed}`}
       />
       <TaskContent className="border-t px-2 pb-2">
         {props.plan.nodes.map((node) => (

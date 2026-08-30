@@ -77,13 +77,13 @@ export const SessionInspectorPanel = (props: {
 
         {isLoading ? (
           <div className="text-muted-foreground rounded border px-3 py-6 text-center text-xs">
-            Carregando sessão...
+            Loading session...
           </div>
         ) : null}
 
         {!isLoading && !inspector ? (
           <div className="text-muted-foreground rounded border px-3 py-6 text-center text-xs">
-            Selecione uma sessão para ver plano e delegações.
+            Select a session to view its plan and delegations.
           </div>
         ) : null}
 
@@ -106,7 +106,7 @@ export const SessionInspectorPanel = (props: {
             {inspector.currentHostPlan ? (
               <div className="rounded border px-3 py-2">
                 <p className="text-muted-foreground text-xs">
-                  Revisão {inspector.session.revision} ·{" "}
+                  Revision {inspector.session.revision} ·{" "}
                   {inspector.currentHostPlan.status}
                 </p>
                 <p className="text-sm">

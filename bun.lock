@@ -77,6 +77,33 @@
         "vite": "^8.1.5",
       },
     },
+    "apps/whats": {
+      "name": "whats",
+      "version": "0.0.0",
+      "dependencies": {
+        "@hackathon/api": "workspace:*",
+        "@hackathon/env": "workspace:*",
+        "@tanstack/react-query": "^5.101.4",
+        "@tanstack/react-router": "^1.170.18",
+        "@trpc/client": "catalog:",
+        "@trpc/server": "catalog:",
+        "@trpc/tanstack-react-query": "^11.18.0",
+        "lucide-react": "catalog:",
+        "react": "catalog:",
+        "react-dom": "catalog:",
+      },
+      "devDependencies": {
+        "@hackathon/config": "workspace:*",
+        "@tailwindcss/vite": "^4.3.3",
+        "@tanstack/router-plugin": "^1.168.23",
+        "@types/react": "catalog:",
+        "@types/react-dom": "catalog:",
+        "@vitejs/plugin-react": "^6.0.4",
+        "tailwindcss": "catalog:",
+        "typescript": "catalog:",
+        "vite": "^8.1.5",
+      },
+    },
     "packages/api": {
       "name": "@hackathon/api",
       "dependencies": {
@@ -1908,6 +1935,8 @@
     "web": ["web@workspace:apps/web"],
 
     "webpack-virtual-modules": ["webpack-virtual-modules@0.6.2", "", {}, "sha512-66/V2i5hQanC51vBQKPH4aI8NMAcBW59FVBs+rC7eGHupMyfn34q7rZIE+ETlJ+XTevqfUhVVBgSUNSW2flEUQ=="],
+
+    "whats": ["whats@workspace:apps/whats"],
 
     "which": ["which@4.0.0", "", { "dependencies": { "isexe": "^3.1.1" }, "bin": { "node-which": "bin/which.js" } }, "sha512-GlaYyEb07DPxYCKhKzplCWBJtvxZcZMrL+4UkrTSJHHPyZU4mYYTv3qaOe77H7EODLSSopAUFAc6W8U4yqvscg=="],
 

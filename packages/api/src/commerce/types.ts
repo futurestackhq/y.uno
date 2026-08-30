@@ -24,6 +24,7 @@ export type HostJobKind = z.infer<typeof hostJobKindSchema>;
 
 export const quickReplyActionSchema = z.enum([
   "details",
+  "confirm_order",
   "buy",
   "pay_now",
   "swap_card",
@@ -46,6 +47,7 @@ export const envelopeSchema = z.discriminatedUnion("type", [
     idempotencyKey: z.string().optional(),
     orderId: z.string().optional(),
     sessionId: z.string(),
+    sourceMessageId: z.string().optional(),
     type: z.literal("quick_reply"),
     userId: z.string(),
   }),

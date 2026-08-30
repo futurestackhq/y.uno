@@ -13,8 +13,8 @@ const snapshot = (text: string, revision = 0): HostContextSnapshot => ({
       id: "sku_petz_racao_premium_10kg",
       kind: "sku",
       priceCents: 12_990,
-      subtitle: "Para cães",
-      title: "Ração Premium 10kg",
+      subtitle: "For dogs",
+      title: "Premium Pet Food 10kg",
     },
   ],
   envelope: { text, type: "user_text", userId: "user_marta" },
@@ -84,8 +84,8 @@ describe("conversation replay", () => {
     };
 
     const turns = [
-      "quero ração pro meu cachorro",
-      "ver detalhes",
+      "I want pet food pro meu cachorro",
+      "ver details",
       "pode ser",
       "sim, quero ela",
     ];
@@ -111,13 +111,13 @@ describe("conversation replay", () => {
   });
 
   it("supersedes corrections and rejects stale delegation", () => {
-    const originalPlan = decision("ração para cachorro", 0);
-    const revisedPlan = decision("ração para gato", 1);
+    const originalPlan = decision("pet food for dogs", 0);
+    const revisedPlan = decision("pet food for cats", 1);
 
     expect(originalPlan.understanding.entities.catalogItemId).toBe(
       "sku_petz_racao_premium_10kg"
     );
-    expect(revisedPlan.decisionSummary).toContain("ração para gato");
+    expect(revisedPlan.decisionSummary).toContain("pet food for cats");
     expect(canDelegatePlan({ baseRevision: 1, sessionRevision: 3 })).toBe(
       false
     );

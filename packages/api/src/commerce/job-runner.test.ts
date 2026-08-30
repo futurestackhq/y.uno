@@ -32,7 +32,7 @@ describe("rankCatalogItems", () => {
           kind: "sku",
           priceCents: 100,
           subtitle: null,
-          title: "Ração inativa",
+          title: "Inactive pet food",
         },
         {
           attributesJson: "{}",
@@ -45,7 +45,7 @@ describe("rankCatalogItems", () => {
           kind: "sku",
           priceCents: 200,
           subtitle: "Cachorro",
-          title: "Ração Premium",
+          title: "Premium Pet Food",
         },
         {
           attributesJson: "{}",
@@ -61,7 +61,7 @@ describe("rankCatalogItems", () => {
           title: "Bola",
         },
       ],
-      "quero ração"
+      "I want pet food"
     );
 
     expect(ranked.map((item) => item.id)).toEqual(["food", "toy"]);

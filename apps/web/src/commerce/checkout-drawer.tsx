@@ -39,7 +39,7 @@ const MOCK_CARD: CardDetails = {
 };
 
 const formatPrice = (cents: number, currency: string) =>
-  new Intl.NumberFormat("pt-BR", {
+  new Intl.NumberFormat("en-US", {
     currency,
     style: "currency",
   }).format(cents / 100);
@@ -104,18 +104,18 @@ export const CheckoutDrawer = (props: {
     >
       <SheetContent side="bottom" className="mx-auto max-h-[85svh] max-w-xl">
         <SheetHeader>
-          <SheetTitle>Finalizar compra</SheetTitle>
+          <SheetTitle>Complete purchase</SheetTitle>
         </SheetHeader>
 
         <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-4 pb-4">
           {checkoutQuery.isLoading ? (
             <div className="text-muted-foreground text-sm">
-              Carregando checkout…
+              Loading checkout…
             </div>
           ) : null}
           {checkoutQuery.isError ? (
             <div className="text-destructive text-sm">
-              Não foi possível carregar o pedido.
+              Unable to load the order.
             </div>
           ) : null}
           {checkout ? (
@@ -123,7 +123,7 @@ export const CheckoutDrawer = (props: {
               <div className="rounded border p-4 text-sm">
                 <div className="font-medium">{checkout.merchant}</div>
                 <div className="text-muted-foreground">
-                  Pedido {checkout.orderId}
+                  Order {checkout.orderId}
                 </div>
               </div>
               <div className="flex flex-col gap-3 rounded border p-4 text-sm">
@@ -145,10 +145,10 @@ export const CheckoutDrawer = (props: {
                 ))}
                 {item ? (
                   <div className="flex items-center justify-between gap-3 border-t pt-3">
-                    <span className="text-muted-foreground">Quantidade</span>
+                    <span className="text-muted-foreground">Quantity</span>
                     <div className="flex items-center gap-2">
                       <Button
-                        aria-label="Diminuir quantidade"
+                        aria-label="Decrease quantity"
                         disabled={
                           item.quantity === 1 ||
                           updateQuantityMutation.isPending
@@ -166,7 +166,7 @@ export const CheckoutDrawer = (props: {
                         {item.quantity}
                       </span>
                       <Button
-                        aria-label="Aumentar quantidade"
+                        aria-label="Increase quantity"
                         disabled={updateQuantityMutation.isPending}
                         onClick={() => {
                           void updateQuantity(item.quantity + 1);
@@ -190,7 +190,7 @@ export const CheckoutDrawer = (props: {
               <FieldGroup className="grid grid-cols-2 gap-3">
                 <Field className="col-span-2">
                   <FieldLabel htmlFor="cardholder-name">
-                    Nome no cartão
+                    Name on card
                   </FieldLabel>
                   <Input
                     id="cardholder-name"
@@ -199,9 +199,7 @@ export const CheckoutDrawer = (props: {
                   />
                 </Field>
                 <Field className="col-span-2">
-                  <FieldLabel htmlFor="card-number">
-                    Número do cartão
-                  </FieldLabel>
+                  <FieldLabel htmlFor="card-number">Card number</FieldLabel>
                   <Input
                     id="card-number"
                     inputMode="numeric"
@@ -209,11 +207,11 @@ export const CheckoutDrawer = (props: {
                     value={card.cardNumber}
                   />
                   <FieldDescription>
-                    Digite qualquer caractere para preencher os dados de teste.
+                    Type any character to fill the test card details.
                   </FieldDescription>
                 </Field>
                 <Field>
-                  <FieldLabel htmlFor="card-expiration">Validade</FieldLabel>
+                  <FieldLabel htmlFor="card-expiration">Expiration</FieldLabel>
                   <Input
                     id="card-expiration"
                     inputMode="numeric"
@@ -257,8 +255,8 @@ export const CheckoutDrawer = (props: {
             type="button"
           >
             {paymentMutation.isPending
-              ? "Processando..."
-              : `Salvar e pagar ${checkout ? formatPrice(checkout.totalCents, checkout.currency) : ""}`}
+              ? "Processing..."
+              : `Save and pay ${checkout ? formatPrice(checkout.totalCents, checkout.currency) : ""}`}
           </Button>
         </SheetFooter>
       </SheetContent>

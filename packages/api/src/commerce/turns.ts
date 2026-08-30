@@ -81,4 +81,4 @@ export const completeTurnWithMessage = async (
 };
 
 export const buildTurnFailureMessage = (summary: string) =>
-  `Não consegui concluir sua solicitação${summary ? ` (${summary})` : ""} agora. Tente novamente em instantes.`;
+  `I could not complete your request${summary ? ` (${summary})` : ""}. Please try again shortly.`;

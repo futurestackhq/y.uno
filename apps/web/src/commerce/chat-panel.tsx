@@ -99,19 +99,19 @@ const getQuickReplyMessage = (value: unknown): string | null => {
 
   const { quickReply } = value as { quickReply?: unknown };
   if (quickReply === "details") {
-    return "Ver detalhes do item";
+    return "View item details";
   }
   if (quickReply === "buy") {
-    return "Comprar este item";
+    return "Buy this item";
   }
   if (quickReply === "pay_now") {
-    return "Pagar agora";
+    return "Pay now";
   }
   if (quickReply === "swap_card") {
-    return "Trocar cartão";
+    return "Change card";
   }
   if (quickReply === "confirm_payment") {
-    return "Confirmar compra";
+    return "Confirm purchase";
   }
   return null;
 };
@@ -339,7 +339,7 @@ export const ChatPanel = (props: {
                   if (carousel) {
                     bubbleBody = (
                       <div className="min-w-65">
-                        <div className="mb-2 text-xs font-medium">Opções</div>
+                        <div className="mb-2 text-xs font-medium">Options</div>
                         <div className="flex snap-x snap-mandatory gap-3 overflow-x-auto pb-2">
                           {carousel.cards.map((c) => (
                             <div
@@ -378,14 +378,6 @@ export const ChatPanel = (props: {
                                       key={cta.action}
                                       onClick={async () => {
                                         if (disabled) {
-                                          return;
-                                        }
-                                        if (
-                                          cta.action === "buy" &&
-                                          !window.confirm(
-                                            `Adicionar ${c.title} (${c.price})?\n\nConfirma seguir para compra?`
-                                          )
-                                        ) {
                                           return;
                                         }
                                         await sendEnvelope({
@@ -505,7 +497,7 @@ export const ChatPanel = (props: {
                           </div>
                           <div className="flex flex-col gap-0.5">
                             <div className="text-base font-medium">
-                              Confirmar
+                              Confirmed
                             </div>
                             <div className="text-muted-foreground text-sm">
                               Response sent
@@ -547,7 +539,7 @@ export const ChatPanel = (props: {
                             <Bubble variant="muted">
                               <BubbleContent>
                                 <div className="text-muted-foreground text-sm">
-                                  orquestrando...
+                                  orchestrating...
                                 </div>
                               </BubbleContent>
                             </Bubble>
@@ -591,11 +583,11 @@ export const ChatPanel = (props: {
             className="flex-1"
             disabled={isSubmitting}
             onChange={(e) => setText(e.target.value)}
-            placeholder="Mensagem…"
+            placeholder="Message…"
             value={text}
           />
           <Button disabled={!text.trim() || isSubmitting} type="submit">
-            {isSubmitting ? "Enviando..." : "Enviar"}
+            {isSubmitting ? "Sending..." : "Send"}
           </Button>
         </form>
       </div>

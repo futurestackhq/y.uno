@@ -1,53 +1,53 @@
-# Modelo de Contrato – Yuno Commerce Marketplace (B2C)
+# Contract Model – Yuno Commerce Marketplace (B2C)
 
-Atualizado: 29 ago 2026
-
----
-
-## 1. Partes
-
-- **Yuno Commerce** (plataforma marketplace e provedor de roteamento de pagamentos)
-- **Empresa Parceira** (merchant que oferece produtos/serviços através do canal Yuno Commerce)
-
-## 2. Escopo do Serviço
-
-A Empresa Parceira disponibiliza seu catálogo de itens, preços e condições de entrega para venda no canal WhatsApp “Yuno Commerce”. A Yuno intermedeia a experiência conversacional, processa pagamento e repassa o valor líquido.
-
-## 3. Remuneração da Yuno
-
-1. **Taxa de roteamento** — igual à já praticada quando o merchant usa o Smart Routing da Yuno em seu próprio checkout.
-2. **Commission Fee** — porcentagem \(\_x\_%\) sobre cada venda **bem-sucedida** realizada via Yuno Commerce, calculada sobre o valor bruto da transação.
-
-> Fórmula do repasse:  
-> `valor_liquido = valor_bruto − taxa_roteamento − (valor_bruto × commission_fee%)`
-
-## 4. Liquidação e Prazo de Repasse
-
-- A liquidação ocorre no mesmo ciclo financeiro já acordado para a Taxa de Roteamento.
-- A comissão adicional é retida no momento do repasse.
-
-## 5. Obrigações da Empresa Parceira
-
-- Manter catálogo, estoque e preços atualizados via API ou feed acordado.
-- Honrar pedidos confirmados pela Yuno Commerce.
-- Tratar suporte pós-venda e logística conforme SLAs.
-
-## 6. Obrigações da Yuno
-
-- Garantir processamento seguro de pagamentos (PCI / LGPD).
-- Fornecer dashboard de pedidos e liquidações.
-- Disponibilizar histórico de chat para fins de disputa.
-
-## 7. Vigência & Rescisão
-
-- Vigência indeterminada; qualquer parte pode rescindir com 30 dias de aviso.
-- Rescisão imediata em caso de violação grave de compliance ou fraude.
-
-## 8. Disputas & Chargebacks
-
-- A Yuno provê trilha de mandato + logs para defesa.
-- A taxa de roteamento não é estornada; a commission fee é estornada proporcionalmente se a venda for revertida.
+Updated: August 29, 2026
 
 ---
 
-_Este documento é referência interna para o modelo financeiro do marketplace; versões legais serão emitidas pelo time jurídico._
+## 1. Parties
+
+- **Yuno Commerce** (marketplace platform and payment-routing provider)
+- **Partner Company** (merchant offering products or services through the Yuno Commerce channel)
+
+## 2. Service Scope
+
+The Partner Company makes its catalog, prices, and delivery terms available for sale through the Yuno Commerce WhatsApp channel. Yuno intermediates the conversational experience, processes payments, and distributes net proceeds.
+
+## 3. Yuno Compensation
+
+1. **Routing fee** — the same fee already charged when the merchant uses Yuno Smart Routing in its own checkout.
+2. **Commission fee** — a percentage \(\_x\_%\) of each successful sale completed through Yuno Commerce, calculated on the gross transaction value.
+
+> Payout formula:  
+> `net_amount = gross_amount − routing_fee − (gross_amount × commission_fee%)`
+
+## 4. Settlement and Payout Timing
+
+- Settlement occurs in the same financial cycle agreed for the routing fee.
+- The additional commission is withheld at payout time.
+
+## 5. Partner Company Responsibilities
+
+- Keep catalog, inventory, and prices updated through the agreed API or feed.
+- Fulfill orders confirmed by Yuno Commerce.
+- Provide post-sale support and logistics according to SLAs.
+
+## 6. Yuno Responsibilities
+
+- Ensure secure payment processing (PCI / LGPD).
+- Provide an order and settlement dashboard.
+- Make chat history available for dispute purposes.
+
+## 7. Term and Termination
+
+- The term is indefinite; either party may terminate with 30 days’ notice.
+- Immediate termination applies in cases of serious compliance breaches or fraud.
+
+## 8. Disputes and Chargebacks
+
+- Yuno provides a mandate trail and logs for dispute defense.
+- The routing fee is not refunded; the commission fee is proportionally refunded if the sale is reversed.
+
+---
+
+_This document is an internal reference for the marketplace financial model; legal versions will be issued by counsel._

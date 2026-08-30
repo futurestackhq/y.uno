@@ -36,21 +36,21 @@ const findForbiddenSchemaKeywords = (value: unknown, path = "$"): string[] => {
 const clarification = {
   conversation: {
     missingInformation: ["animal"],
-    question: "É para cachorro ou gato?",
+    question: "Is it for a dog or cat?",
     state: "needs_clarification",
   },
-  decisionSummary: "O produto foi entendido, mas o animal não.",
+  decisionSummary: "The product was understood, but not the animal.",
   plan: { goal: "Clarificar a necessidade", nodes: [] },
   session: { action: "continue", sessionId: "sess_1" },
   understanding: {
     confidence: 0.74,
     constraints: {},
-    entities: { product: "ração" },
+    entities: { product: "pet food" },
     intent: "purchase_product",
     references: {},
-    summary: "O usuário quer comprar ração.",
+    summary: "The user wants to buy pet food.",
   },
-  userMessage: "É para cachorro ou gato?",
+  userMessage: "Is it for a dog or cat?",
 };
 
 describe("host contracts", () => {
@@ -78,14 +78,14 @@ describe("host contracts", () => {
           question: null,
           state: "respond_directly",
         },
-        decisionSummary: "Saudação respondida sem delegação.",
-        plan: { goal: "Responder à saudação", nodes: [] },
+        decisionSummary: "Greeting answered without delegation.",
+        plan: { goal: "Respond to greeting", nodes: [] },
         understanding: {
           ...clarification.understanding,
           confidence: 0.99,
           intent: "greeting",
         },
-        userMessage: "Olá! O que você procura hoje?",
+        userMessage: "Hello! What are you looking for today?",
       })
     ).toBeTruthy();
   });
@@ -99,7 +99,7 @@ describe("host contracts", () => {
           question: null,
           state: "respond_directly",
         },
-        plan: { goal: "Responder à saudação", nodes: [] },
+        plan: { goal: "Respond to greeting", nodes: [] },
         userMessage: null,
       })
     ).toThrow("Direct responses require a user message");
@@ -125,7 +125,7 @@ describe("host contracts", () => {
       hostPlanDecisionSchema.parse({
         ...clarification,
         plan: {
-          goal: "Buscar produto",
+          goal: "Find product",
           nodes: [
             {
               dependsOn: ["search"],
@@ -146,7 +146,7 @@ describe("host contracts", () => {
       hostPlanDecisionSchema.parse({
         ...clarification,
         plan: {
-          goal: "Comprar produto",
+          goal: "Buy product",
           nodes: [
             {
               dependsOn: ["details"],
@@ -161,8 +161,8 @@ describe("host contracts", () => {
               id: "details",
               input: {},
               kind: "catalog_details",
-              objective: "Consultar detalhes",
-              successCriteria: ["Detalhes disponíveis"],
+              objective: "Consultar details",
+              successCriteria: ["Details available"],
             },
           ],
         },
@@ -175,7 +175,7 @@ describe("host contracts", () => {
       hostPlanDecisionSchema.parse({
         ...clarification,
         plan: {
-          goal: "Buscar produto",
+          goal: "Find product",
           nodes: [
             {
               dependsOn: ["missing"],
@@ -194,7 +194,7 @@ describe("host contracts", () => {
   it("accepts typed synthesis messages", () => {
     expect(
       hostSynthesisDecisionSchema.parse({
-        assistantMessage: { content: { text: "Olá!" }, type: "text" },
+        assistantMessage: { content: { text: "Hello!" }, type: "text" },
         nextAction: "await_user",
       })
     ).toBeTruthy();
@@ -209,14 +209,15 @@ describe("host contracts", () => {
             {
               catalogItemId: "sku_1",
               ctas: [
-                { action: "details", label: "Ver detalhes" },
-                { action: "buy", label: "Comprar" },
+                { action: "details", label: "View details" },
+                { action: "buy", label: "Buy" },
               ],
               id: "sku_1",
+              imageUrl: "https://example.com/pet-food.jpg",
               merchant: "Pet store",
               price: "R$ 89,90",
               subtitle: null,
-              title: "Ração",
+              title: "Pet food",
             },
           ],
           merchant: null,
@@ -224,7 +225,7 @@ describe("host contracts", () => {
           paymentHint: null,
           subtitle: null,
           text: null,
-          title: "Opções para seu pet",
+          title: "Options for your pet",
           total: null,
         },
         type: "carousel",

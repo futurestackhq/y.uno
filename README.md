@@ -1,8 +1,32 @@
 # FutureStack
 
-NextWave Hackathon 2026 (Yuno × Nauta, São Paulo). Official public repo.
+FutureStack is an agentic commerce platform that lets customers discover products and complete secure payments through a conversational interface. It combines a WhatsApp-inspired customer experience, a merchant onboarding dashboard, and a durable host-agent orchestration runtime.
 
-This project was created with [Better-T-Stack](https://github.com/AmanVarshney01/create-better-t-stack), a modern TypeScript stack that combines React, TanStack Router, Hono, TRPC, and more.
+## How it works
+
+```mermaid
+flowchart TD
+  inbound[Inbound message or event] --> ingestion[Lightweight ingestion]
+  ingestion --> hostPlan[Host plan job]
+  hostPlan --> model["GPT-5.6 Luna with conversation and session context"]
+  model --> validate[Validate and persist decision, session, and plan]
+  validate --> clarification[Clarification response and wait]
+  validate --> delegations[Materialize ready plan nodes]
+  delegations --> subagents[Specialized subagents]
+  subagents --> synthesis[Host synthesis job]
+  synthesis --> response[Response, next plan, or session completion]
+```
+
+The host agent understands the conversation and creates a durable plan. The runtime validates authorization, schemas, idempotency, retries, and side effects. Specialized subagents execute bounded work; the host synthesizes the final customer-facing response.
+
+## Applications
+
+- `apps/web` — merchant onboarding, catalog management, order overview, and orchestration inspector.
+- `apps/whats` — standalone WhatsApp-inspired customer commerce experience.
+- `apps/server` — Hono/tRPC API runtime deployed to Cloudflare Workers.
+- `packages/api` — commerce domain, host-agent orchestration, jobs, prompts, and tests.
+- `packages/db` — Drizzle schema, migrations, and D1 access.
+- `packages/ui` — shared shadcn/ui primitives and design tokens.
 
 ## Features
 
@@ -12,14 +36,20 @@ This project was created with [Better-T-Stack](https://github.com/AmanVarshney01
 - **Shared UI package** - shadcn/ui primitives live in `packages/ui`
 - **Hono** - Lightweight, performant server framework
 - **tRPC** - End-to-end type-safe APIs
-- **workers** - Runtime environment
+- **Cloudflare Workers** - Runtime environment
 - **Drizzle** - TypeScript-first ORM
 - **Cloudflare D1** - Database engine
 - **Turborepo** - Optimized monorepo build system
 
 ## Getting Started
 
-First, install the dependencies:
+### Prerequisites
+
+- Bun 1.2.20+
+- Node.js 20+ for compatible tooling
+- A Cloudflare account for deployment and D1 provisioning
+
+Install dependencies:
 
 ```bash
 bun install
@@ -39,13 +69,29 @@ Alchemy provisions the D1 database and applies migrations during `deploy`.
 bun run db:generate
 ```
 
-Then, run the development server:
+Run the development environment:
 
 ```bash
 bun run dev
 ```
 
 Open [http://localhost:3001](http://localhost:3001) in your browser to see the web application. The API is running at [http://localhost:3000](http://localhost:3000).
+
+The standalone WhatsApp application can be run from its workspace:
+
+```bash
+bun --cwd apps/whats dev
+```
+
+## Validation
+
+```bash
+bun run check-types
+bun run check
+bun test packages/api/src/commerce
+```
+
+Use `bun run fix` to apply the repository formatter and automatic lint fixes.
 
 ## UI Customization
 
