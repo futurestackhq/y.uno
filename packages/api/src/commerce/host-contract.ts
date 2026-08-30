@@ -32,6 +32,15 @@ const planSchema = z
         });
       }
       ids.add(node.id);
+      for (const dependency of node.dependsOn) {
+        if (!plan.nodes.some((candidate) => candidate.id === dependency)) {
+          context.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: `Unknown plan node dependency: ${dependency}`,
+            path: ["nodes"],
+          });
+        }
+      }
       if (node.dependsOn.includes(node.id)) {
         context.addIssue({
           code: z.ZodIssueCode.custom,

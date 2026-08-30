@@ -102,11 +102,17 @@ export const normalizePlanJson = (
   }
 
   const validNodes = existing.nodes.filter(isPlanNode);
-  const existingById = new Map(validNodes.map((node) => [node.id, node]));
+  const validNodeIds = new Set(validNodes.map((node) => node.id));
+  const dependencySafeNodes = validNodes.filter((node) =>
+    node.deps.every((dependency) => validNodeIds.has(dependency))
+  );
+  const existingById = new Map(
+    dependencySafeNodes.map((node) => [node.id, node])
+  );
   const missingNodes = fallback.nodes.filter(
     (node) => !existingById.has(node.id)
   );
-  const nodes = [...validNodes, ...missingNodes].toSorted((a, b) => {
+  const nodes = [...dependencySafeNodes, ...missingNodes].toSorted((a, b) => {
     const aIndex = PLAN_NODE_IDS.indexOf(
       a.id as (typeof PLAN_NODE_IDS)[number]
     );

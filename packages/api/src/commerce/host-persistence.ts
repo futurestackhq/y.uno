@@ -1,6 +1,6 @@
 import type { Db } from "@hackathon/db";
 import { schema } from "@hackathon/db";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 
 import { logEvent } from "./events";
 import { hostPlanDecisionSchema } from "./host-contract";
@@ -75,17 +75,11 @@ export const persistHostPlan = async (
   const planId = crypto.randomUUID();
   const timestamp = new Date().toISOString();
 
-  await db.batch([
-    db.insert(schema.hostPlans).values({
-      baseRevision: sessionRevision,
-      createdAt: timestamp,
-      decisionJson: JSON.stringify(decision),
-      decisionSummary: decision.decisionSummary,
-      id: planId,
-      sessionId,
-      status: "persisted",
-      updatedAt: timestamp,
-    }),
+  const nextStatus =
+    decision.conversation.state === "needs_clarification"
+      ? "awaiting_user"
+      : "active";
+  const results = await db.batch([
     existing
       ? db
           .update(schema.sessions)
@@ -97,13 +91,15 @@ export const persistHostPlan = async (
               decision.understanding.constraints
             ),
             revision: sessionRevision,
-            status:
-              decision.conversation.state === "needs_clarification"
-                ? "awaiting_user"
-                : "active",
+            status: nextStatus,
             updatedAt: timestamp,
           })
-          .where(eq(schema.sessions.id, sessionId))
+          .where(
+            and(
+              eq(schema.sessions.id, sessionId),
+              eq(schema.sessions.revision, baseRevision)
+            )
+          )
       : db.insert(schema.sessions).values({
           contextJson: JSON.stringify(decision.understanding.entities),
           createdAt: timestamp,
@@ -112,35 +108,50 @@ export const persistHostPlan = async (
           planJson: JSON.stringify(decision.plan),
           requirementsJson: JSON.stringify(decision.understanding.constraints),
           revision: sessionRevision,
-          status:
-            decision.conversation.state === "needs_clarification"
-              ? "awaiting_user"
-              : "active",
+          status: nextStatus,
           updatedAt: timestamp,
           userId: input.envelope.userId,
         }),
+    db.insert(schema.hostPlans).values({
+      baseRevision,
+      createdAt: timestamp,
+      decisionJson: JSON.stringify(decision),
+      decisionSummary: decision.decisionSummary,
+      id: planId,
+      sessionId,
+      status: "persisted",
+      updatedAt: timestamp,
+    }),
   ]);
+  if (existing && results[0].meta.changes !== 1) {
+    throw new Error("Host plan revision is stale");
+  }
 
-  await Promise.all([
+  const eventPromises = [
     logEvent(db, {
-      data: { baseRevision: sessionRevision, planId },
+      data: { baseRevision, planId },
       eventType: "host_plan_started",
       level: "info",
       sessionId,
     }),
     logEvent(db, {
-      data: { baseRevision: sessionRevision, planId },
+      data: { baseRevision, planId },
       eventType: "host_plan_persisted",
       level: "info",
       sessionId,
     }),
-    logEvent(db, {
-      data: { revision: sessionRevision, status: "active" },
-      eventType: "session_status_changed",
-      level: "info",
-      sessionId,
-    }),
-  ]);
+  ];
+  if (!existing || existing.status !== nextStatus) {
+    eventPromises.push(
+      logEvent(db, {
+        data: { revision: sessionRevision, status: nextStatus },
+        eventType: "session_status_changed",
+        level: "info",
+        sessionId,
+      })
+    );
+  }
+  await Promise.all(eventPromises);
 
   const [session] = await db
     .select()
@@ -151,7 +162,7 @@ export const persistHostPlan = async (
     throw new Error("Host session was not persisted");
   }
   return {
-    baseRevision: sessionRevision,
+    baseRevision,
     decision,
     planId,
     session,

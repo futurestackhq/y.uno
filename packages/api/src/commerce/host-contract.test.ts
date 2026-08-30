@@ -80,6 +80,27 @@ describe("host contracts", () => {
     ).toThrow();
   });
 
+  it("rejects dependencies that do not reference a plan node", () => {
+    expect(() =>
+      hostPlanDecisionSchema.parse({
+        ...clarification,
+        plan: {
+          goal: "Buscar produto",
+          nodes: [
+            {
+              dependsOn: ["missing"],
+              id: "search",
+              input: {},
+              kind: "catalog_search",
+              objective: "Encontrar produtos",
+              successCriteria: ["Resultados encontrados"],
+            },
+          ],
+        },
+      })
+    ).toThrow("Unknown plan node dependency");
+  });
+
   it("accepts typed synthesis messages", () => {
     expect(
       hostSynthesisDecisionSchema.parse({
