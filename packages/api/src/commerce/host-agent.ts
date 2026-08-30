@@ -6,13 +6,17 @@ import { generateText, Output, stepCountIs } from "ai";
 import { assembleHostContext } from "./host-context";
 import type { HostContextSnapshot } from "./host-context";
 import {
-  hostPlanDecisionSchema,
-  hostSynthesisDecisionSchema,
+  decodeHostPlanOutput,
+  decodeHostSynthesisOutput,
+  hostPlanOutputSchema,
+  hostSynthesisOutputSchema,
 } from "./host-contract";
 import type { HostPlanDecision, HostSynthesisDecision } from "./host-contract";
 import { createHostTools } from "./host-tools";
 import { buildHostPlanningPrompt, buildHostSynthesisPrompt } from "./prompts";
 import type { Envelope } from "./types";
+
+const HOST_MODEL_TIMEOUT_MS = 30_000;
 
 export interface HostSynthesisInput {
   context: unknown;
@@ -29,7 +33,7 @@ const lunaModel: HostModel = {
   async plan(snapshot) {
     const result = await generateText({
       model: openai.responses(env.ORCHESTRATOR_MODEL),
-      output: Output.object({ schema: hostPlanDecisionSchema }),
+      output: Output.object({ schema: hostPlanOutputSchema }),
       prompt: buildHostPlanningPrompt({ context: snapshot }),
       providerOptions: {
         openai: {
@@ -39,17 +43,18 @@ const lunaModel: HostModel = {
         },
       },
       stopWhen: stepCountIs(4),
+      timeout: HOST_MODEL_TIMEOUT_MS,
       tools: createHostTools(snapshot),
     });
     if (!result.output) {
       throw new Error("Host returned no structured planning decision");
     }
-    return hostPlanDecisionSchema.parse(result.output);
+    return decodeHostPlanOutput(result.output);
   },
   async synthesize(input) {
     const result = await generateText({
       model: openai.responses(env.ORCHESTRATOR_MODEL),
-      output: Output.object({ schema: hostSynthesisDecisionSchema }),
+      output: Output.object({ schema: hostSynthesisOutputSchema }),
       prompt: buildHostSynthesisPrompt({
         context: { ...input.snapshot, result: input.context },
       }),
@@ -61,12 +66,13 @@ const lunaModel: HostModel = {
         },
       },
       stopWhen: stepCountIs(4),
+      timeout: HOST_MODEL_TIMEOUT_MS,
       tools: createHostTools(input.snapshot),
     });
     if (!result.output) {
       throw new Error("Host returned no structured synthesis decision");
     }
-    return hostSynthesisDecisionSchema.parse(result.output);
+    return decodeHostSynthesisOutput(result.output);
   },
 };
 

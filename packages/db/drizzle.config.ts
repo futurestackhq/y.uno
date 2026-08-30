@@ -10,5 +10,5 @@ export default defineConfig({
   dialect: "sqlite",
   driver: "d1-http",
   out: "./src/migrations",
-  schema: "./src/schema",
+  schema: "./src/schema.ts",
 });

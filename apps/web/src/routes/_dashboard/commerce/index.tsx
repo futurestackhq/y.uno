@@ -15,7 +15,7 @@ import {
 } from "@hackathon/ui/components/dialog";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import type { SendableEnvelope } from "@/commerce/chat-panel";
@@ -31,6 +31,9 @@ const refreshCommerceQueries = async () => {
   });
   await queryClient.invalidateQueries({
     queryKey: trpc.commerce.getSessions.queryKey(),
+  });
+  await queryClient.invalidateQueries({
+    queryKey: trpc.commerce.getDefaultPaymentMethod.queryKey(),
   });
   await queryClient.invalidateQueries({ queryKey: trpc.commerce.pathKey() });
 };
@@ -57,6 +60,11 @@ const CommercePage = () => {
 
   const messagesQuery = useQuery(trpc.commerce.getMessages.queryOptions());
   const sessionsQuery = useQuery(trpc.commerce.getSessions.queryOptions());
+  const defaultPaymentMethodQuery = useQuery(
+    trpc.commerce.getDefaultPaymentMethod.queryOptions({
+      userId: "user_marta",
+    })
+  );
   const pendingWorkQuery = useQuery(
     trpc.commerce.getPendingWork.queryOptions(
       selectedSessionId
@@ -66,6 +74,22 @@ const CommercePage = () => {
     )
   );
   const isWorking = pendingWorkQuery.data?.pending ?? false;
+  const wasWorking = useRef(false);
+
+  useEffect(() => {
+    if (isWorking) {
+      wasWorking.current = true;
+      return;
+    }
+
+    if (!wasWorking.current) {
+      return;
+    }
+
+    wasWorking.current = false;
+    void refreshCommerceQueries();
+  }, [isWorking]);
+
   const activeRefetchInterval = isWorking ? 500 : false;
   const inspectorQuery = useQuery(
     trpc.commerce.getSessionInspector.queryOptions(
@@ -88,6 +112,7 @@ const CommercePage = () => {
   const sendEnvelopeMutation = useMutation(
     trpc.commerce.sendEnvelope.mutationOptions()
   );
+  const { mutate: tick } = useMutation(trpc.commerce.tick.mutationOptions());
   const resetDemoDataMutation = useMutation(
     trpc.commerce.resetDemoData.mutationOptions({
       onSuccess: async () => {
@@ -134,6 +159,20 @@ const CommercePage = () => {
     await refreshCommerceQueries();
   };
 
+  useEffect(() => {
+    if (!isWorking) {
+      return;
+    }
+
+    // The API starts work asynchronously. Keep processing delayed retries while
+    // this demo is open so a failed attempt always reaches a terminal response.
+    const intervalId = window.setInterval(() => {
+      tick();
+    }, 1e3);
+
+    return () => window.clearInterval(intervalId);
+  }, [isWorking, tick]);
+
   return (
     <>
       <div className={pageTransform}>
@@ -159,12 +198,36 @@ const CommercePage = () => {
             </CardHeader>
             <CardContent className="min-h-0 flex-1 px-0">
               <ChatPanel
+                hasSavedPaymentMethod={Boolean(defaultPaymentMethodQuery.data)}
                 messages={messagesQuery.data ?? []}
                 isWorking={isWorking}
                 onOpenCheckout={(orderId, sessionId) => {
                   setCheckoutSessionId(sessionId);
                   setCheckoutUrl(`/checkout?orderId=${orderId}`);
                   setBrowserOpen(true);
+                }}
+                onPayWithSavedCard={async (orderId, sessionId) => {
+                  const paymentMethod = defaultPaymentMethodQuery.data;
+                  if (!paymentMethod) {
+                    setCheckoutSessionId(sessionId);
+                    setCheckoutUrl(`/checkout?orderId=${orderId}`);
+                    setBrowserOpen(true);
+                    return;
+                  }
+
+                  await sendEnvelopeMutation.mutateAsync({
+                    brand: paymentMethod.brand,
+                    last4: paymentMethod.last4,
+                    orderId,
+                    sessionId,
+                    status: "paid",
+                    token: paymentMethod.token,
+                    tokenSaved: false,
+                    type: "checkout_returned",
+                    userId: "user_marta",
+                  });
+                  toast.success("Pagamento realizado com o cartão salvo.");
+                  await refreshCommerceQueries();
                 }}
                 sendEnvelope={send}
               />
@@ -177,7 +240,9 @@ const CommercePage = () => {
                 inspector={inspectorQuery.data}
                 isLoading={inspectorQuery.isLoading}
                 onSelectSessionId={(id) => {
-                  setSelectedSessionId(id);
+                  setSelectedSessionId((currentId) =>
+                    currentId === id ? null : id
+                  );
                   setSelectedJobId(null);
                 }}
                 selectedSessionId={selectedSessionId}
@@ -224,6 +289,7 @@ const CommercePage = () => {
             orderId: msg.order_id,
             sessionId: checkoutSessionId,
             status: msg.status,
+            token: msg.token,
             tokenSaved: msg.tokenSaved,
             type: "checkout_returned",
             userId: "user_marta",

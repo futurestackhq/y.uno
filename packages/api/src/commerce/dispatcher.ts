@@ -1,19 +1,24 @@
 import type { Db } from "@hackathon/db";
 import { schema } from "@hackathon/db";
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, isNull, lte, or } from "drizzle-orm";
 
 import { logEvent } from "./events";
 import { buildPlan, normalizePlanJson } from "./plan";
+import { buildTurnFailureMessage, completeTurnWithMessage } from "./turns";
 import { envelopeSchema, getInboundFollowUpText } from "./types";
 import type { Envelope } from "./types";
 
 const nowIso = () => new Date().toISOString();
+const QUEUE_LEASE_MS = 60_000;
 
 const addMessage = async (
   db: Db,
   params: {
     userId: string;
     sessionId?: string;
+    turnId?: string;
+    requestId?: string;
+    inReplyToMessageId?: string;
     role: "user" | "assistant" | "system";
     type:
       | "text"
@@ -25,15 +30,20 @@ const addMessage = async (
     content: unknown;
   }
 ) => {
+  const id = crypto.randomUUID();
   await db.insert(schema.messages).values({
     contentJson: JSON.stringify(params.content),
     createdAt: nowIso(),
-    id: crypto.randomUUID(),
+    id,
+    inReplyToMessageId: params.inReplyToMessageId,
+    requestId: params.requestId,
     role: params.role,
     sessionId: params.sessionId,
+    turnId: params.turnId,
     type: params.type,
     userId: params.userId,
   });
+  return id;
 };
 
 const getLatestSession = async (db: Db, userId: string) => {
@@ -59,11 +69,18 @@ const getSessionById = async (db: Db, sessionId: string) => {
 
 const ensureSession = async (
   db: Db,
-  params: { userId: string; requestedSessionId?: string }
+  params: {
+    userId: string;
+    requestedSessionId?: string;
+    reuseLatestSession?: boolean;
+  }
 ) => {
-  const existing = params.requestedSessionId
-    ? await getSessionById(db, params.requestedSessionId)
-    : await getLatestSession(db, params.userId);
+  let existing = null;
+  if (params.requestedSessionId) {
+    existing = await getSessionById(db, params.requestedSessionId);
+  } else if (params.reuseLatestSession) {
+    existing = await getLatestSession(db, params.userId);
+  }
 
   if (existing && existing.userId !== params.userId) {
     throw new Error("Session does not belong to envelope user");
@@ -128,15 +145,37 @@ const ensureSession = async (
 const handleUserText = async (
   db: Db,
   envelope: Extract<Envelope, { type: "user_text" }>,
-  meta: { messageQueueId: string }
+  meta: { messageQueueId: string; turnId: string }
 ) => {
   const session = await ensureSession(db, {
     requestedSessionId: envelope.sessionId,
+    reuseLatestSession: true,
     userId: envelope.userId,
   });
   if (!session) {
     throw new Error("Failed to create commerce session");
   }
+
+  const { turnId } = meta;
+  const requestId = envelope.idempotencyKey ?? turnId;
+  const messageId = await addMessage(db, {
+    content: { text: envelope.text },
+    requestId,
+    role: "user",
+    sessionId: session.id,
+    turnId,
+    type: "text",
+    userId: envelope.userId,
+  });
+  await db
+    .update(schema.commerceTurns)
+    .set({
+      inboundMessageId: messageId,
+      sessionId: session.id,
+      status: "processing",
+      updatedAt: nowIso(),
+    })
+    .where(eq(schema.commerceTurns.id, turnId));
 
   await logEvent(db, {
     data: {
@@ -147,14 +186,6 @@ const handleUserText = async (
     eventType: "envelope_received",
     level: "info",
     sessionId: session.id,
-  });
-
-  await addMessage(db, {
-    content: { text: envelope.text },
-    role: "user",
-    sessionId: session.id,
-    type: "text",
-    userId: envelope.userId,
   });
 
   const jobId = crypto.randomUUID();
@@ -177,6 +208,7 @@ const handleUserText = async (
     startedAt: null,
     status: "queued",
     subagentName: "conversational-host",
+    turnId,
     updatedAt: nowIso(),
   });
 
@@ -202,7 +234,7 @@ const handleUserText = async (
 const handleQuickReply = async (
   db: Db,
   envelope: Extract<Envelope, { type: "quick_reply" }>,
-  meta: { messageQueueId: string }
+  meta: { messageQueueId: string; turnId: string }
 ) => {
   const session = await ensureSession(db, {
     requestedSessionId: envelope.sessionId,
@@ -224,17 +256,28 @@ const handleQuickReply = async (
     sessionId: envelope.sessionId,
   });
 
-  await addMessage(db, {
+  const messageId = await addMessage(db, {
     content: {
       catalogItemId: envelope.catalogItemId,
       orderId: envelope.orderId,
       quickReply: envelope.action,
     },
+    requestId: envelope.idempotencyKey ?? meta.turnId,
     role: "user",
     sessionId: envelope.sessionId,
+    turnId: meta.turnId,
     type: "text",
     userId: envelope.userId,
   });
+  await db
+    .update(schema.commerceTurns)
+    .set({
+      inboundMessageId: messageId,
+      sessionId: session.id,
+      status: "processing",
+      updatedAt: nowIso(),
+    })
+    .where(eq(schema.commerceTurns.id, meta.turnId));
 
   await logEvent(db, {
     data: {
@@ -247,20 +290,24 @@ const handleQuickReply = async (
     sessionId: envelope.sessionId,
   });
 
+  // oxlint-disable-next-line no-use-before-define
   await enqueueInboundHostFollowUp(
     db,
     envelope,
     meta.messageQueueId,
-    session.id
+    session.id,
+    meta.turnId
   );
 };
 
-const enqueueInboundHostFollowUp = async (
+// oxlint-disable-next-line func-style
+async function enqueueInboundHostFollowUp(
   db: Db,
   envelope: Exclude<Envelope, { type: "user_text" }>,
   messageQueueId: string,
-  sessionId: string
-) => {
+  sessionId: string,
+  turnId: string
+) {
   const jobId = crypto.randomUUID();
   const ts = nowIso();
   await db.insert(schema.jobs).values({
@@ -271,8 +318,8 @@ const enqueueInboundHostFollowUp = async (
     id: jobId,
     inputJson: JSON.stringify({
       envelope,
-      messageQueueId,
       followUpText: getInboundFollowUpText(envelope),
+      messageQueueId,
     }),
     kind: "host_plan",
     leaseExpiresAt: null,
@@ -283,6 +330,7 @@ const enqueueInboundHostFollowUp = async (
     startedAt: null,
     status: "queued",
     subagentName: "conversational-host",
+    turnId,
     updatedAt: ts,
   });
   await logEvent(db, {
@@ -299,12 +347,12 @@ const enqueueInboundHostFollowUp = async (
     level: "info",
     sessionId,
   });
-};
+}
 
 const handleCheckoutReturned = async (
   db: Db,
   envelope: Extract<Envelope, { type: "checkout_returned" }>,
-  meta: { messageQueueId: string }
+  meta: { messageQueueId: string; turnId: string }
 ) => {
   const session = await ensureSession(db, {
     requestedSessionId: envelope.sessionId,
@@ -313,6 +361,73 @@ const handleCheckoutReturned = async (
   if (!session) {
     throw new Error("Commerce session not found");
   }
+  const [order] = await db
+    .select()
+    .from(schema.orders)
+    .where(
+      and(
+        eq(schema.orders.id, envelope.orderId),
+        eq(schema.orders.sessionId, session.id)
+      )
+    )
+    .limit(1);
+  if (!order) {
+    throw new Error("Order not found for this commerce session");
+  }
+
+  const { paymentMethodId: existingPaymentMethodId } = order;
+  let paymentMethodId = existingPaymentMethodId;
+  if (envelope.status === "paid" && envelope.tokenSaved) {
+    if (!envelope.brand || !envelope.last4 || !envelope.token) {
+      throw new Error("Saved card checkout return is missing card data");
+    }
+    paymentMethodId = crypto.randomUUID();
+    await db.batch([
+      db
+        .update(schema.paymentMethods)
+        .set({ isDefault: false })
+        .where(eq(schema.paymentMethods.userId, envelope.userId)),
+      db.insert(schema.paymentMethods).values({
+        brand: envelope.brand,
+        id: paymentMethodId,
+        isDefault: true,
+        last4: envelope.last4,
+        token: envelope.token,
+        userId: envelope.userId,
+      }),
+    ]);
+  }
+
+  if (envelope.status === "paid" && !paymentMethodId) {
+    throw new Error("No saved payment method is available for this payment");
+  }
+
+  await db
+    .update(schema.orders)
+    .set({
+      paymentMethodId,
+      status: envelope.status === "paid" ? "paid" : "failed",
+      updatedAt: nowIso(),
+    })
+    .where(eq(schema.orders.id, order.id));
+  const messageId = await addMessage(db, {
+    content: { orderId: envelope.orderId, status: envelope.status },
+    requestId: envelope.idempotencyKey ?? meta.turnId,
+    role: "user",
+    sessionId: session.id,
+    turnId: meta.turnId,
+    type: "text",
+    userId: envelope.userId,
+  });
+  await db
+    .update(schema.commerceTurns)
+    .set({
+      inboundMessageId: messageId,
+      sessionId: session.id,
+      status: "processing",
+      updatedAt: nowIso(),
+    })
+    .where(eq(schema.commerceTurns.id, meta.turnId));
   await logEvent(db, {
     data: {
       messageQueueId: meta.messageQueueId,
@@ -331,19 +446,36 @@ const handleCheckoutReturned = async (
     sessionId: envelope.sessionId,
   });
 
-  await enqueueInboundHostFollowUp(
-    db,
-    envelope,
-    meta.messageQueueId,
-    session.id
-  );
+  await completeTurnWithMessage(db, {
+    content: {
+      text:
+        envelope.status === "paid"
+          ? "Pagamento realizado com sucesso! Seu pedido foi confirmado."
+          : "Não foi possível processar o pagamento. Tente novamente.",
+    },
+    outcome: envelope.status === "paid" ? "succeeded" : "failed",
+    sessionId: session.id,
+    turnId: meta.turnId,
+    type: "text",
+  });
 };
 
 export const dispatchOnce = async (db: Db) => {
   const [queued] = await db
     .select()
     .from(schema.messageQueue)
-    .where(eq(schema.messageQueue.status, "pending"))
+    .where(
+      or(
+        eq(schema.messageQueue.status, "pending"),
+        and(
+          eq(schema.messageQueue.status, "processing"),
+          or(
+            isNull(schema.messageQueue.leaseExpiresAt),
+            lte(schema.messageQueue.leaseExpiresAt, nowIso())
+          )
+        )
+      )
+    )
     .orderBy(schema.messageQueue.receivedAt)
     .limit(1);
 
@@ -353,11 +485,24 @@ export const dispatchOnce = async (db: Db) => {
 
   const claimResult = await db
     .update(schema.messageQueue)
-    .set({ status: "processing" })
+    .set({
+      attempts: queued.attempts + 1,
+      leaseExpiresAt: new Date(Date.now() + QUEUE_LEASE_MS).toISOString(),
+      status: "processing",
+    })
     .where(
       and(
         eq(schema.messageQueue.id, queued.id),
-        eq(schema.messageQueue.status, "pending")
+        or(
+          eq(schema.messageQueue.status, "pending"),
+          and(
+            eq(schema.messageQueue.status, "processing"),
+            or(
+              isNull(schema.messageQueue.leaseExpiresAt),
+              lte(schema.messageQueue.leaseExpiresAt, nowIso())
+            )
+          )
+        )
       )
     );
 
@@ -378,31 +523,54 @@ export const dispatchOnce = async (db: Db) => {
   try {
     const parsed = envelopeSchema.parse(JSON.parse(claimed.payloadJson));
     const envelope = parsed as Envelope;
+    const { turnId } = claimed;
+    if (!turnId) {
+      throw new Error("Queued envelope has no commerce turn");
+    }
 
     if (envelope.type === "user_text") {
-      await handleUserText(db, envelope, { messageQueueId: claimed.id });
+      await handleUserText(db, envelope, {
+        messageQueueId: claimed.id,
+        turnId,
+      });
     } else if (envelope.type === "quick_reply") {
-      await handleQuickReply(db, envelope, { messageQueueId: claimed.id });
+      await handleQuickReply(db, envelope, {
+        messageQueueId: claimed.id,
+        turnId,
+      });
     } else if (envelope.type === "checkout_returned") {
       await handleCheckoutReturned(db, envelope, {
         messageQueueId: claimed.id,
+        turnId,
       });
     }
 
     await db
       .update(schema.messageQueue)
-      .set({ error: null, status: "done" })
+      .set({ error: null, leaseExpiresAt: null, status: "done" })
       .where(eq(schema.messageQueue.id, claimed.id));
 
     return { processed: 1 } as const;
   } catch (error) {
+    const errorMessage =
+      error instanceof Error ? error.message : "unknown_error";
     await db
       .update(schema.messageQueue)
       .set({
-        error: error instanceof Error ? error.message : "unknown_error",
+        error: errorMessage,
+        leaseExpiresAt: null,
         status: "failed",
       })
       .where(eq(schema.messageQueue.id, claimed.id));
+    if (claimed.turnId) {
+      await completeTurnWithMessage(db, {
+        content: { text: buildTurnFailureMessage(errorMessage) },
+        outcome: "failed",
+        sessionId: claimed.sessionId,
+        turnId: claimed.turnId,
+        type: "text",
+      });
+    }
 
     return { processed: 1 } as const;
   }

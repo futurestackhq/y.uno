@@ -17,7 +17,8 @@ type PlannedExecutionEventType =
   | "job_failed"
   | "session_status_changed"
   | "host_plan_started"
-  | "host_plan_persisted";
+  | "host_plan_persisted"
+  | "plan_superseded";
 
 type CommerceExecutionEventType =
   | "buy_missing_catalog_item"
@@ -30,6 +31,7 @@ type CommerceExecutionEventType =
 export interface ExecutionEvent {
   sessionId: string;
   jobId?: string;
+  turnId?: string;
   level: ExecutionEventLevel;
   eventType: PlannedExecutionEventType | CommerceExecutionEventType;
   data: unknown;
@@ -48,12 +50,13 @@ export const logEvent = async (db: Db, event: ExecutionEvent) => {
     level: event.level,
     line: event.line?.slice(0, 1000),
     sessionId: event.sessionId,
+    turnId: event.turnId,
   });
 };
 
 export const logProgressLine = async (
   db: Db,
-  params: { sessionId: string; jobId: string; line: string }
+  params: { sessionId: string; jobId: string; line: string; turnId?: string }
 ) => {
   await logEvent(db, {
     data: {},
@@ -62,5 +65,6 @@ export const logProgressLine = async (
     level: "info",
     line: params.line.slice(0, 1000),
     sessionId: params.sessionId,
+    turnId: params.turnId,
   });
 };

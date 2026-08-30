@@ -1,8 +1,6 @@
 # Agentic Purchase Mandate – Options Ahead (29 Aug 2026)
 
-> Documentation requested by the team before selecting the final thesis. The
-> goal is to record the *facts* uncovered so far and the alternative paths
-> discussed – without favouring any single direction.
+> Documentation requested by the team before selecting the final thesis. The goal is to record the _facts_ uncovered so far and the alternative paths discussed – without favouring any single direction.
 
 ---
 
@@ -10,7 +8,7 @@
 
 | Requirement excerpt | Practical meaning |
 | --- | --- |
-| “A human creates a purchase **mandate** for their agent: what, how much, until when, payment method” | Persisted, revocable permission object – *not* the raw card – with amount, category, expiry, instrument. |
+| “A human creates a purchase **mandate** for their agent: what, how much, until when, payment method” | Persisted, revocable permission object – _not_ the raw card – with amount, category, expiry, instrument. |
 | “The **merchant verifies** the mandate before accepting” | An API or contract the merchant must call (`verify`) before it charges. |
 | “Agent completes purchase, human sees record, merchant sees verification, auditor sees full trail” | One append-only log queried from three views. |
 | “Handle outside-mandate attempts, revocation, impersonation, dispute” | Gate out-of-scope transactions, kill switch, audit trail for 10.4/13.1 disputes. |
@@ -22,7 +20,7 @@
 
 | Layer | Existing products | Gap surfaced by the brief |
 | --- | --- | --- |
-| **Checkout handshake**<br>(agent ↔︎ merchant) | ACP (OpenAI + Stripe), UCP, TAP, X402 | *Covered* – integration cost, not permission. |
+| **Checkout handshake**<br>(agent ↔︎ merchant) | ACP (OpenAI + Stripe), UCP, TAP, X402 | _Covered_ – integration cost, not permission. |
 | **Payment-consent / mandate** | Visa Intelligent Commerce (cards), Google AP2 (cryptographic mandate) | **Missing for LATAM A2A / Pix / wallets** and for merchants on Yuno. |
 | **Rails & routing** | Yuno orchestration, Smart Routing, tokens, Pix | Yuno moves money but does **not** supply mandates / verify. |
 | **Ops agents** | Yuno Concierge, NOVA retry, fraud/chat | Different job – recovery/ops, not authorisation. |
@@ -31,12 +29,12 @@
 
 ## 3. Market Context (LATAM 2026)
 
-* 20–40 vendors per enterprise ↔︎ 30–50 % engineering on plumbing (Yuno Playbook 2026).
-* Pix owns **41 %** of Brazilian e-commerce value; card declines vary 55–90 %.
-* Agentic commerce already ~20 % of e-commerce tasks (Yuno ACP post, May 2026).
-* Visa IC / AP2 focus on cards & passkeys — **Pix / SPEI / PSE have no mandate layer yet**.
+- 20–40 vendors per enterprise ↔︎ 30–50 % engineering on plumbing (Yuno Playbook 2026).
+- Pix owns **41 %** of Brazilian e-commerce value; card declines vary 55–90 %.
+- Agentic commerce already ~20 % of e-commerce tasks (Yuno ACP post, May 2026).
+- Visa IC / AP2 focus on cards & passkeys — **Pix / SPEI / PSE have no mandate layer yet**.
 
-Implication: merchants on Yuno need a permission layer *above* Pix/OXXO and *below* ACP/UCP.
+Implication: merchants on Yuno need a permission layer _above_ Pix/OXXO and _below_ ACP/UCP.
 
 ---
 
@@ -65,20 +63,20 @@ Implication: merchants on Yuno need a permission layer *above* Pix/OXXO and *bel
 
 ## 6. Technical Building Blocks Already in Repo
 
-* Cloudflare Workers + D1 SQLite (free limits OK).
-* tRPC API scaffold – place `verify()` here.
-* UI shell (dashboard nav) – three views can be wired quickly.
-* Ports pattern; fake provider adapter ready; Yuno Agent Toolkit can slot in.
+- Cloudflare Workers + D1 SQLite (free limits OK).
+- tRPC API scaffold – place `verify()` here.
+- UI shell (dashboard nav) – three views can be wired quickly.
+- Ports pattern; fake provider adapter ready; Yuno Agent Toolkit can slot in.
 
 ---
 
 ## 7. Decision Gates Ahead
 
-1. **Choose thesis** (A/B/C/D/E). The canvas *mandate-briefing* shows trade-offs visually.
-2. If **A**, define mandate schema + verify flow detail.<br>  • Amount, currency, category, expiry, payment instrument id, agent id.<br>  • Revocation: `status = "revoked"`, timestamp.
+1. **Choose thesis** (A/B/C/D/E). The canvas _mandate-briefing_ shows trade-offs visually.
+2. If **A**, define mandate schema + verify flow detail.<br> • Amount, currency, category, expiry, payment instrument id, agent id.<br> • Revocation: `status = "revoked"`, timestamp.
 3. Lock demo script (four beats: create → in-mandate buy → over-limit denial → revoke).
 4. Confirm scope for bonus features (dispute trail, price-condition trigger, adversarial agent scenario).
 
 ---
 
-*Document generated 29 Aug 2026 18:41 UTC by request. No option is endorsed yet.*
+_Document generated 29 Aug 2026 18:41 UTC by request. No option is endorsed yet._

@@ -3,6 +3,7 @@
 **Date:** 2026-08-30  
 **Status:** Draft (approved in chat; pending spec review)  
 **Related:**
+
 - `docs/superpowers/specs/2026-08-29-yuno-commerce-mvp-design.md`
 - `docs/superpowers/specs/2026-08-29-yuno-commerce-mvp-implementation-spec.md`
 - `docs/superpowers/specs/2026-08-30-yuno-commerce-orchestration-harness-mvp.md`
@@ -316,4 +317,3 @@ Target:
 
 - Refactor into dispatcher + job runner, with standardized timeline events and job attempt records.
 - Update UI to use the 3-column layout with minified accordions and a Subagents Live panel.
-

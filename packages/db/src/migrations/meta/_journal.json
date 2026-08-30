@@ -29,6 +29,13 @@
       "when": 1788071718425,
       "tag": "0003_strange_wolverine",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1788076240553,
+      "tag": "0004_pretty_stranger",
+      "breakpoints": true
     }
   ]
 }

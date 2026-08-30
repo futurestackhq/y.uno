@@ -1,6 +1,19 @@
 import { describe, expect, it } from "bun:test";
 
-import { buildDelegationPrompt } from "./prompts";
+import { buildDelegationPrompt, buildHostPlanningPrompt } from "./prompts";
+
+describe("buildHostPlanningPrompt", () => {
+  it("requires concise marketplace responses for social turns", () => {
+    const prompt = buildHostPlanningPrompt({ context: {} });
+
+    expect(prompt).toContain("respond_directly");
+    expect(prompt).toContain("Olá! O que você procura hoje?");
+    expect(prompt).toContain(
+      "marketplace of stores offering products or services"
+    );
+    expect(prompt).toContain("one short sentence");
+  });
+});
 
 describe("buildDelegationPrompt", () => {
   it("includes stable header and expected output contract", () => {

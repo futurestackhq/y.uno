@@ -38,19 +38,66 @@ const toIdempotencyKey = (envelope: Envelope): string => {
 export const enqueueEnvelope = async (db: Db, envelope: Envelope) => {
   await seedDemoData(db);
   await ensureUser(db, envelope.userId);
+  const requestId = envelope.idempotencyKey ?? crypto.randomUUID();
+  const [existingTurn] = await db
+    .select()
+    .from(schema.commerceTurns)
+    .where(
+      and(
+        eq(schema.commerceTurns.requestId, requestId),
+        eq(schema.commerceTurns.userId, envelope.userId)
+      )
+    )
+    .limit(1);
+  if (existingTurn) {
+    return {
+      sessionId: existingTurn.sessionId,
+      turnId: existingTurn.id,
+    } as const;
+  }
 
-  await db
-    .insert(schema.messageQueue)
-    .values({
-      id: crypto.randomUUID(),
-      idempotencyKey: toIdempotencyKey(envelope),
-      payloadJson: JSON.stringify(envelope),
-      receivedAt: nowIso(),
-      status: "pending",
-      type: envelope.type,
-      userId: envelope.userId,
-    })
-    .onConflictDoNothing();
+  const turnId = crypto.randomUUID();
+  const payload = { ...envelope, idempotencyKey: requestId };
+  let summary: string;
+  if (envelope.type === "user_text") {
+    summary = envelope.text;
+  } else if (envelope.type === "quick_reply") {
+    summary = `Ação selecionada: ${envelope.action}`;
+  } else {
+    summary = `Retorno do checkout: ${envelope.status}`;
+  }
+
+  await db.batch([
+    db
+      .insert(schema.commerceTurns)
+      .values({
+        createdAt: nowIso(),
+        id: turnId,
+        requestId,
+        sessionId: envelope.sessionId,
+        status: "queued",
+        summary,
+        updatedAt: nowIso(),
+        userId: envelope.userId,
+      })
+      .onConflictDoNothing(),
+    db
+      .insert(schema.messageQueue)
+      .values({
+        id: crypto.randomUUID(),
+        idempotencyKey: requestId ?? toIdempotencyKey(envelope),
+        payloadJson: JSON.stringify(payload),
+        receivedAt: nowIso(),
+        sessionId: envelope.sessionId,
+        status: "pending",
+        turnId,
+        type: envelope.type,
+        userId: envelope.userId,
+      })
+      .onConflictDoNothing(),
+  ]);
+
+  return { sessionId: envelope.sessionId ?? null, turnId } as const;
 };
 
 export const tickOnce = async (db: Db) => {

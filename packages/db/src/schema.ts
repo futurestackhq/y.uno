@@ -62,6 +62,30 @@ export const sessions = sqliteTable("sessions", {
   userId: text("user_id").notNull(),
 });
 
+export const commerceTurns = sqliteTable(
+  "commerce_turns",
+  {
+    createdAt: text("created_at").notNull().$defaultFn(now),
+    id: text("id").primaryKey(),
+    inboundMessageId: text("inbound_message_id"),
+    requestId: text("request_id").notNull(),
+    sessionId: text("session_id"),
+    status: text("status", {
+      enum: ["queued", "processing", "succeeded", "failed", "superseded"],
+    }).notNull(),
+    summary: text("summary").notNull(),
+    terminalMessageId: text("terminal_message_id"),
+    updatedAt: text("updated_at").notNull().$defaultFn(now),
+    userId: text("user_id").notNull(),
+  },
+  (table) => ({
+    userRequestUnique: uniqueIndex("commerce_turns_user_request_unique").on(
+      table.userId,
+      table.requestId
+    ),
+  })
+);
+
 export const hostPlans = sqliteTable(
   "host_plans",
   {
@@ -88,8 +112,11 @@ export const messages = sqliteTable("messages", {
   contentJson: text("content_json").notNull(),
   createdAt: text("created_at").notNull().$defaultFn(now),
   id: text("id").primaryKey(),
+  inReplyToMessageId: text("in_reply_to_message_id"),
+  requestId: text("request_id"),
   role: text("role", { enum: ["user", "assistant", "system"] }).notNull(),
   sessionId: text("session_id"),
+  turnId: text("turn_id"),
   type: text("type", {
     enum: [
       "text",
@@ -106,14 +133,18 @@ export const messages = sqliteTable("messages", {
 export const messageQueue = sqliteTable(
   "message_queue",
   {
+    attempts: integer("attempts").notNull().default(0),
     error: text("error"),
     id: text("id").primaryKey(),
     idempotencyKey: text("idempotency_key"),
+    leaseExpiresAt: text("lease_expires_at"),
     payloadJson: text("payload_json").notNull(),
     receivedAt: text("received_at").notNull().$defaultFn(now),
+    sessionId: text("session_id"),
     status: text("status", {
       enum: ["pending", "processing", "done", "failed"],
     }).notNull(),
+    turnId: text("turn_id"),
     type: text("type").notNull(),
     userId: text("user_id").notNull(),
   },
@@ -144,6 +175,7 @@ export const jobs = sqliteTable("jobs", {
     enum: ["queued", "running", "done", "failed"],
   }).notNull(),
   subagentName: text("subagent_name"),
+  turnId: text("turn_id"),
   updatedAt: text("updated_at").notNull().$defaultFn(now),
 });
 
@@ -156,6 +188,7 @@ export const executionLogs = sqliteTable("execution_logs", {
   level: text("level", { enum: ["info", "warn", "error"] }).notNull(),
   line: text("line"),
   sessionId: text("session_id").notNull(),
+  turnId: text("turn_id"),
 });
 
 export const orders = sqliteTable("orders", {
@@ -192,6 +225,7 @@ export const paymentMethods = sqliteTable("payment_methods", {
 });
 
 export const schema = {
+  commerceTurns,
   connectionCatalogItems,
   connections,
   executionLogs,

@@ -18,7 +18,7 @@ import {
   MessageScrollerViewport,
 } from "@hackathon/ui/components/message-scroller";
 import type { ReactNode } from "react";
-import { useMemo, useState } from "react";
+import { useState } from "react";
 
 type ChatRole = "user" | "assistant" | "system";
 
@@ -251,24 +251,23 @@ const normalizePurchaseSummaryContent = (
 };
 
 export const ChatPanel = (props: {
+  hasSavedPaymentMethod: boolean;
   isWorking?: boolean;
   messages: ChatMessageRow[];
   onOpenCheckout: (orderId: string, sessionId: string) => void;
+  onPayWithSavedCard: (orderId: string, sessionId: string) => Promise<void>;
   sendEnvelope: (envelope: SendableEnvelope) => Promise<void>;
 }) => {
-  const { isWorking = false, messages, onOpenCheckout, sendEnvelope } = props;
+  const {
+    hasSavedPaymentMethod,
+    isWorking = false,
+    messages,
+    onOpenCheckout,
+    onPayWithSavedCard,
+    sendEnvelope,
+  } = props;
   const [text, setText] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
-
-  const latestSessionId = useMemo(() => {
-    for (let i = messages.length - 1; i >= 0; i -= 1) {
-      const sid = messages[i]?.sessionId ?? null;
-      if (typeof sid === "string" && sid.length > 0) {
-        return sid;
-      }
-    }
-    return null;
-  }, [messages]);
 
   return (
     <div className="flex h-full min-h-0 flex-col">
@@ -398,11 +397,18 @@ export const ChatPanel = (props: {
                                     type: "quick_reply",
                                   });
 
-                                  if (
-                                    b.action === "pay_now" ||
-                                    b.action === "swap_card"
-                                  ) {
+                                  const opensCheckout =
+                                    b.action === "confirm_payment" ||
+                                    b.action === "swap_card" ||
+                                    (b.action === "pay_now" &&
+                                      !hasSavedPaymentMethod);
+                                  if (opensCheckout) {
                                     onOpenCheckout(
+                                      purchaseSummary.orderId,
+                                      sessionId
+                                    );
+                                  } else if (b.action === "pay_now") {
+                                    await onPayWithSavedCard(
                                       purchaseSummary.orderId,
                                       sessionId
                                     );
@@ -487,14 +493,10 @@ export const ChatPanel = (props: {
               return;
             }
 
-            const payload = latestSessionId
-              ? { sessionId: latestSessionId, text: trimmed }
-              : { text: trimmed };
-
             setIsSubmitting(true);
             try {
               await sendEnvelope({
-                payload: { ...payload, idempotencyKey: crypto.randomUUID() },
+                payload: { idempotencyKey: crypto.randomUUID(), text: trimmed },
                 type: "user_text",
               });
             } catch (error) {

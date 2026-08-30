@@ -11,6 +11,8 @@ declare global {
 
 declare module "cloudflare:workers" {
   namespace Cloudflare {
-    export interface Env extends CloudflareEnv {}
+    export interface Env extends CloudflareEnv {
+      readonly __brand?: never;
+    }
   }
 }

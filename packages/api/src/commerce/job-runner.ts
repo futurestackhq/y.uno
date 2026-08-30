@@ -22,6 +22,11 @@ import type { RankedItem } from "./job-runner-helpers";
 import type { PlanNodeStatus } from "./plan";
 import { normalizePlanJson } from "./plan";
 import { buildDelegationPrompt } from "./prompts";
+import {
+  buildTurnFailureMessage,
+  completeTurnWithMessage,
+  getTurn,
+} from "./turns";
 import type { Envelope } from "./types";
 
 const LEASE_MS = 60_000;
@@ -64,7 +69,8 @@ const addMs = (base: Date, ms: number) =>
 const parseJson = <T>(json: string): T => JSON.parse(json) as T;
 
 const buildReply = (input: ComposeReplyInput): ComposeReplyResult => {
-  if (input.rankedItems.length === 0) {
+  const [first] = input.rankedItems;
+  if (!first) {
     return {
       message: {
         items: [],
@@ -74,7 +80,6 @@ const buildReply = (input: ComposeReplyInput): ComposeReplyResult => {
     };
   }
 
-  const [first] = input.rankedItems;
   return {
     message: {
       items: input.rankedItems,
@@ -141,6 +146,7 @@ const enqueueJob = async (
     subagentName: string;
     planId?: string;
     nodeId?: string;
+    turnId?: string;
   }
 ) => {
   const ts = nowIso();
@@ -186,12 +192,15 @@ const enqueueJob = async (
     kind: params.kind,
     leaseExpiresAt: null,
     nextRunAt: ts,
+    nodeId: params.nodeId ?? null,
+    planId: params.planId ?? null,
     promptText,
     resultJson: null,
     sessionId: params.session.id,
     startedAt: null,
     status: "queued",
     subagentName: params.subagentName,
+    turnId: params.turnId,
     updatedAt: ts,
   });
 
@@ -201,7 +210,7 @@ const enqueueJob = async (
       planJson: updatePlanNode(params.session.planJson, {
         intent: params.session.intent,
         jobId,
-        nodeId: params.kind,
+        nodeId: params.nodeId ?? params.kind,
         now: ts,
         status: "ready",
       }),
@@ -237,7 +246,7 @@ const markJobPlanNodeRunning = async (db: Db, job: JobRow) => {
       planJson: updatePlanNode(session.planJson, {
         intent: session.intent,
         jobId: job.id,
-        nodeId: job.kind,
+        nodeId: job.nodeId ?? job.kind,
         now: ts,
         status: "running",
       }),
@@ -253,7 +262,16 @@ const claimNextJob = async (db: Db): Promise<JobRow | null> => {
     .from(schema.jobs)
     .where(
       and(
-        eq(schema.jobs.status, "queued"),
+        or(
+          eq(schema.jobs.status, "queued"),
+          and(
+            eq(schema.jobs.status, "running"),
+            or(
+              isNull(schema.jobs.leaseExpiresAt),
+              lte(schema.jobs.leaseExpiresAt, now)
+            )
+          )
+        ),
         or(isNull(schema.jobs.nextRunAt), lte(schema.jobs.nextRunAt, now)),
         or(
           isNull(schema.jobs.leaseExpiresAt),
@@ -283,7 +301,16 @@ const claimNextJob = async (db: Db): Promise<JobRow | null> => {
     .where(
       and(
         eq(schema.jobs.id, queued.id),
-        eq(schema.jobs.status, "queued"),
+        or(
+          eq(schema.jobs.status, "queued"),
+          and(
+            eq(schema.jobs.status, "running"),
+            or(
+              isNull(schema.jobs.leaseExpiresAt),
+              lte(schema.jobs.leaseExpiresAt, now)
+            )
+          )
+        ),
         or(
           isNull(schema.jobs.leaseExpiresAt),
           lte(schema.jobs.leaseExpiresAt, now)
@@ -361,7 +388,7 @@ const completeJob = async (
         planJson: updatePlanNode(params.session.planJson, {
           intent: params.session.intent,
           jobId: job.id,
-          nodeId: job.kind,
+          nodeId: job.nodeId ?? job.kind,
           now: ts,
           status: "done",
         }),
@@ -409,7 +436,7 @@ const failJob = async (db: Db, job: JobRow, error: unknown) => {
         planJson: updatePlanNode(session.planJson, {
           intent: session.intent,
           jobId: job.id,
-          nodeId: job.kind,
+          nodeId: job.nodeId ?? job.kind,
           now: ts.toISOString(),
           status: "ready",
         }),
@@ -426,7 +453,7 @@ const failJob = async (db: Db, job: JobRow, error: unknown) => {
         planJson: updatePlanNode(session.planJson, {
           intent: session.intent,
           jobId: job.id,
-          nodeId: job.kind,
+          nodeId: job.nodeId ?? job.kind,
           now: ts.toISOString(),
           status: "failed",
         }),
@@ -434,6 +461,18 @@ const failJob = async (db: Db, job: JobRow, error: unknown) => {
         updatedAt: ts.toISOString(),
       })
       .where(eq(schema.sessions.id, job.sessionId));
+    if (job.turnId) {
+      const turn = await getTurn(db, job.turnId);
+      if (turn) {
+        await completeTurnWithMessage(db, {
+          content: { text: buildTurnFailureMessage(turn.summary) },
+          outcome: "failed",
+          sessionId: session.id,
+          turnId: job.turnId,
+          type: "text",
+        });
+      }
+    }
   }
 
   await logEvent(db, {
@@ -466,7 +505,8 @@ const materializeDecisionNodes = async (
   db: Db,
   planId: string,
   session: SessionRow,
-  decision: Awaited<ReturnType<typeof runHostPlan>>
+  decision: Awaited<ReturnType<typeof runHostPlan>>,
+  turnId?: string
 ) => {
   await Promise.all(
     decision.plan.nodes
@@ -475,9 +515,12 @@ const materializeDecisionNodes = async (
         enqueueJob(db, {
           input: { ...node.input, objective: node.objective, planId },
           kind: node.kind,
+          nodeId: node.id,
+          planId,
           session,
           sourceJobId: planId,
           subagentName: `host-${node.kind}`,
+          turnId,
         })
       )
   );
@@ -485,11 +528,15 @@ const materializeDecisionNodes = async (
 
 const runHostPlanJob = async (db: Db, job: JobRow, model?: HostModel) => {
   const input = parseJson<{ envelope: Envelope }>(job.inputJson);
-  const snapshot = await assembleHostContext(db, { envelope: input.envelope });
+  const snapshot = await assembleHostContext(db, {
+    envelope: input.envelope,
+    sessionId: job.sessionId,
+  });
   const decision = await runHostPlan({
     db,
     envelope: input.envelope,
     model,
+    sessionId: job.sessionId,
     snapshot,
   });
   const persisted = await persistHostPlan(db, {
@@ -497,6 +544,7 @@ const runHostPlanJob = async (db: Db, job: JobRow, model?: HostModel) => {
     envelope: input.envelope,
     sessionId: job.sessionId,
     sourceJob: job,
+    turnId: job.turnId ?? undefined,
   });
   await completeJob(
     db,
@@ -504,25 +552,41 @@ const runHostPlanJob = async (db: Db, job: JobRow, model?: HostModel) => {
     { planId: persisted.planId },
     { session: persisted.session }
   );
-  if (decision.conversation.state === "needs_clarification") {
-    if (decision.userMessage) {
-      await writeAssistantMessage(
-        db,
-        persisted.session.id,
-        input.envelope.userId,
-        {
-          text: decision.userMessage,
-        }
-      );
+  if (
+    decision.conversation.state === "needs_clarification" ||
+    decision.conversation.state === "respond_directly"
+  ) {
+    if (!decision.userMessage) {
+      throw new Error("Host planning response had no terminal user message");
     }
+    await (job.turnId
+      ? completeTurnWithMessage(db, {
+          content: { text: decision.userMessage },
+          outcome: "succeeded",
+          sessionId: persisted.session.id,
+          turnId: job.turnId,
+          type: "text",
+        })
+      : writeAssistantMessage(db, persisted.session.id, input.envelope.userId, {
+          text: decision.userMessage,
+        }));
+    await db
+      .update(schema.hostPlans)
+      .set({ status: "completed", updatedAt: nowIso() })
+      .where(eq(schema.hostPlans.id, persisted.planId));
     return;
   }
   await materializeDecisionNodes(
     db,
     persisted.planId,
     persisted.session,
-    decision
+    decision,
+    job.turnId ?? undefined
   );
+  await db
+    .update(schema.hostPlans)
+    .set({ status: "delegated", updatedAt: nowIso() })
+    .where(eq(schema.hostPlans.id, persisted.planId));
 };
 
 export const materializeReadyPlanNodes = async (db: Db, planId: string) => {
@@ -541,6 +605,7 @@ export const materializeReadyPlanNodes = async (db: Db, planId: string) => {
     .select()
     .from(schema.jobs)
     .where(eq(schema.jobs.planId, planId));
+  const turnId = jobs.find((job) => job.turnId)?.turnId ?? undefined;
   const done = new Set(
     jobs.filter((job) => job.status === "done").map((job) => job.nodeId)
   );
@@ -565,9 +630,14 @@ export const materializeReadyPlanNodes = async (db: Db, planId: string) => {
         session,
         sourceJobId: planId,
         subagentName: `host-${node.kind}`,
+        turnId,
       })
     )
   );
+  await db
+    .update(schema.hostPlans)
+    .set({ status: "delegated", updatedAt: nowIso() })
+    .where(eq(schema.hostPlans.id, planId));
   return { materialized: pendingNodes.length, stale: false };
 };
 
@@ -578,6 +648,7 @@ export const scheduleHostSynthesis = async (db: Db, planId: string) => {
     .select()
     .from(schema.jobs)
     .where(eq(schema.jobs.planId, planId));
+  const turnId = jobs.find((job) => job.turnId)?.turnId ?? undefined;
   if (
     !plan.decision.plan.nodes.every((node) =>
       jobs.some(
@@ -599,6 +670,7 @@ export const scheduleHostSynthesis = async (db: Db, planId: string) => {
     session,
     sourceJobId: planId,
     subagentName: "host-synthesis",
+    turnId,
   });
   return true;
 };
@@ -671,6 +743,16 @@ const runComposeReply = async (db: Db, job: JobRow) => {
 const runSpecializedPlanNode = async (db: Db, job: JobRow) => {
   const input = parseJson<Record<string, unknown>>(job.inputJson);
   const session = await getSession(db, job.sessionId);
+  if (
+    job.planId &&
+    typeof input.baseRevision === "number" &&
+    !canDelegatePlan({
+      baseRevision: input.baseRevision,
+      sessionRevision: session.revision,
+    })
+  ) {
+    throw new Error("Plan revision became stale before side effect");
+  }
   let result: Record<string, unknown>;
   if (job.kind === "catalog_search") {
     const items = await db.select().from(schema.connectionCatalogItems);
@@ -687,9 +769,63 @@ const runSpecializedPlanNode = async (db: Db, job: JobRow) => {
       .limit(1);
     result = { item: item ?? null };
   } else if (job.kind === "create_order") {
-    result = { input, requiresConfirmation: true, status: "draft" };
+    const itemId = String(input.catalogItemId ?? input.itemId ?? "");
+    const [item] = await db
+      .select()
+      .from(schema.connectionCatalogItems)
+      .where(eq(schema.connectionCatalogItems.id, itemId))
+      .limit(1);
+    if (!item) {
+      throw new Error(`Catalog item not found: ${itemId}`);
+    }
+    const orderId = String(input.orderId ?? crypto.randomUUID());
+    const qty = Math.max(1, Number(input.quantity ?? input.qty ?? 1));
+    const timestamp = nowIso();
+    await db.insert(schema.orders).values({
+      connectionId: item.connectionId,
+      createdAt: timestamp,
+      currency: item.currency,
+      id: orderId,
+      paymentMethodId: null,
+      sessionId: session.id,
+      status: "draft",
+      totalCents: item.priceCents * qty,
+      updatedAt: timestamp,
+    });
+    await db.insert(schema.orderItems).values({
+      catalogItemId: item.id,
+      id: crypto.randomUUID(),
+      lineTotalCents: item.priceCents * qty,
+      orderId,
+      qty,
+      unitPriceCents: item.priceCents,
+    });
+    result = {
+      orderId,
+      requiresConfirmation: true,
+      status: "draft",
+      totalCents: item.priceCents * qty,
+    };
   } else {
-    result = { purchaseSummary: input, status: "awaiting_confirmation" };
+    const orderId = String(input.orderId ?? "");
+    const [order] = await db
+      .select()
+      .from(schema.orders)
+      .where(eq(schema.orders.id, orderId))
+      .limit(1);
+    if (!order) {
+      throw new Error(`Order not found: ${orderId}`);
+    }
+    await db
+      .update(schema.orders)
+      .set({ status: "checkout_started", updatedAt: nowIso() })
+      .where(eq(schema.orders.id, order.id));
+    result = {
+      orderId: order.id,
+      purchaseSummary: input,
+      requiresConfirmation: true,
+      status: "awaiting_confirmation",
+    };
   }
   await completeJob(db, job, result, { session });
   await materializeReadyPlanNodes(db, job.planId as string);
@@ -716,10 +852,22 @@ const runJob = async (db: Db, job: JobRow, model?: HostModel) => {
           sessionRevision: session.revision,
         })
       ) {
+        await markHostPlanSuperseded(db, plan.id);
         await completeJob(db, job, { planSuperseded: true }, {});
+        if (job.turnId) {
+          await completeTurnWithMessage(db, {
+            content: {
+              text: "Recebi uma atualização mais recente e deixei esta solicitação de lado.",
+            },
+            outcome: "superseded",
+            sessionId: session.id,
+            turnId: job.turnId,
+            type: "text",
+          });
+        }
         await logEvent(db, {
           data: { planId: job.planId },
-          eventType: "plan_superseded" as "job_done",
+          eventType: "plan_superseded",
           jobId: job.id,
           level: "info",
           sessionId: job.sessionId,
@@ -747,18 +895,40 @@ const runJob = async (db: Db, job: JobRow, model?: HostModel) => {
       } as Envelope;
       const decision = await runHostSynthesis({
         context: nodeJobs.map((node) => ({
+          error: node.errorText,
           nodeId: node.nodeId,
           result: node.resultJson,
+          status: node.status,
         })),
         db,
         envelope,
         model,
       });
+      const failedNodes = nodeJobs.filter(
+        (node) => node.nodeId !== "host_synthesis" && node.status === "failed"
+      );
       await persistHostSynthesis(db, {
-        decision,
+        decision:
+          failedNodes.length > 0
+            ? {
+                ...decision,
+                assistantMessage: {
+                  content: {
+                    failureContext: failedNodes.map((node) => ({
+                      error: node.errorText,
+                      nodeId: node.nodeId,
+                    })),
+                    text: "Não consegui concluir essa solicitação porque uma etapa falhou. Vou encaminhar o problema para atendimento.",
+                  },
+                  type: "text",
+                },
+                nextAction: "await_user",
+              }
+            : decision,
         jobId: job.id,
         plan,
         session,
+        turnId: job.turnId ?? undefined,
       });
       await completeJob(db, job, decision, {});
     } else if (
@@ -782,6 +952,14 @@ export const runJobsOnce = async (
   db: Db,
   params: { limit: number; model?: HostModel }
 ): Promise<{ ran: number }> => {
+  const persistedPlans = await db
+    .select()
+    .from(schema.hostPlans)
+    .where(eq(schema.hostPlans.status, "persisted"));
+  await Promise.all(
+    persistedPlans.map((plan) => materializeReadyPlanNodes(db, plan.id))
+  );
+
   const runNext = async (remaining: number, ran: number): Promise<number> => {
     if (remaining <= 0) {
       return ran;

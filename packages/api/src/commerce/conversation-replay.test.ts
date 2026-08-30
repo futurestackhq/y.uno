@@ -118,7 +118,7 @@ describe("conversation replay", () => {
       "sku_petz_racao_premium_10kg"
     );
     expect(revisedPlan.decisionSummary).toContain("ração para gato");
-    expect(canDelegatePlan({ baseRevision: 1, sessionRevision: 2 })).toBe(
+    expect(canDelegatePlan({ baseRevision: 1, sessionRevision: 3 })).toBe(
       false
     );
   });

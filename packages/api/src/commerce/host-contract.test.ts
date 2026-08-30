@@ -1,9 +1,37 @@
 import { describe, expect, it } from "bun:test";
 
+import { zodSchema } from "ai";
+
 import {
+  hostPlanOutputSchema,
   hostPlanDecisionSchema,
+  hostSynthesisOutputSchema,
   hostSynthesisDecisionSchema,
 } from "./host-contract";
+
+const forbiddenOpenAiSchemaKeywords = new Set(["oneOf", "propertyNames"]);
+
+const findForbiddenSchemaKeywords = (value: unknown, path = "$"): string[] => {
+  if (!value || typeof value !== "object") {
+    return [];
+  }
+  if (Array.isArray(value)) {
+    return value.flatMap((item, index) =>
+      findForbiddenSchemaKeywords(item, `${path}[${index}]`)
+    );
+  }
+
+  const object = value as Record<string, unknown>;
+  const matches = Object.keys(object)
+    .filter((key) => forbiddenOpenAiSchemaKeywords.has(key))
+    .map((key) => `${path}.${key}`);
+  return [
+    ...matches,
+    ...Object.entries(object).flatMap(([key, child]) =>
+      findForbiddenSchemaKeywords(child, `${path}.${key}`)
+    ),
+  ];
+};
 
 const clarification = {
   conversation: {
@@ -26,8 +54,70 @@ const clarification = {
 };
 
 describe("host contracts", () => {
+  it("emits OpenAI-compatible structured output schemas", async () => {
+    const schemas = [hostPlanOutputSchema, hostSynthesisOutputSchema];
+    const jsonSchemas = await Promise.all(
+      schemas.map((schema) => zodSchema(schema).jsonSchema)
+    );
+
+    for (const jsonSchema of jsonSchemas) {
+      expect(findForbiddenSchemaKeywords(jsonSchema)).toEqual([]);
+    }
+  });
+
   it("accepts a clarification without delegations", () => {
     expect(hostPlanDecisionSchema.parse(clarification)).toBeTruthy();
+  });
+
+  it("accepts a concise direct response without delegations", () => {
+    expect(
+      hostPlanDecisionSchema.parse({
+        ...clarification,
+        conversation: {
+          missingInformation: [],
+          question: null,
+          state: "respond_directly",
+        },
+        decisionSummary: "Saudação respondida sem delegação.",
+        plan: { goal: "Responder à saudação", nodes: [] },
+        understanding: {
+          ...clarification.understanding,
+          confidence: 0.99,
+          intent: "greeting",
+        },
+        userMessage: "Olá! O que você procura hoje?",
+      })
+    ).toBeTruthy();
+  });
+
+  it("rejects silent direct responses", () => {
+    expect(() =>
+      hostPlanDecisionSchema.parse({
+        ...clarification,
+        conversation: {
+          missingInformation: [],
+          question: null,
+          state: "respond_directly",
+        },
+        plan: { goal: "Responder à saudação", nodes: [] },
+        userMessage: null,
+      })
+    ).toThrow("Direct responses require a user message");
+  });
+
+  it("rejects delegation decisions without plan nodes", () => {
+    expect(() =>
+      hostPlanDecisionSchema.parse({
+        ...clarification,
+        conversation: {
+          missingInformation: [],
+          question: null,
+          state: "ready_to_delegate",
+        },
+        plan: { goal: "Buscar no marketplace", nodes: [] },
+        userMessage: null,
+      })
+    ).toThrow("Delegation requires at least one plan node");
   });
 
   it("rejects self-referential dependencies", () => {

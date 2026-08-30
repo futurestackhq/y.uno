@@ -5,6 +5,7 @@ import { and, eq } from "drizzle-orm";
 import { logEvent } from "./events";
 import { hostPlanDecisionSchema } from "./host-contract";
 import type { HostPlanDecision, HostSynthesisDecision } from "./host-contract";
+import { completeTurnWithMessage } from "./turns";
 import type { Envelope } from "./types";
 
 export { canDelegatePlan } from "./reset";
@@ -40,6 +41,47 @@ export interface PersistedHostPlan {
   sessionRevision: number;
 }
 
+type SessionRow = typeof schema.sessions.$inferSelect;
+
+const getSelectedSession = async (
+  db: Db,
+  input: {
+    decision: HostPlanDecision;
+    envelope: Envelope;
+    sessionId?: string;
+  }
+): Promise<SessionRow | undefined> => {
+  const requestedId =
+    input.sessionId ??
+    input.decision.session.sessionId ??
+    input.envelope.sessionId;
+  if (!requestedId && input.decision.session.action === "create") {
+    return undefined;
+  }
+  if (!requestedId) {
+    throw new Error("Host selected no session for a continuing turn");
+  }
+  const [session] = await db
+    .select()
+    .from(schema.sessions)
+    .where(eq(schema.sessions.id, requestedId))
+    .limit(1);
+  if (!session) {
+    throw new Error("Host selected a session that does not exist");
+  }
+  if (session.userId !== input.envelope.userId) {
+    throw new Error("Host session does not belong to envelope user");
+  }
+  return session;
+};
+
+const getNextSessionStatus = (decision: HostPlanDecision) =>
+  ["needs_clarification", "respond_directly"].includes(
+    decision.conversation.state
+  )
+    ? "awaiting_user"
+    : "active";
+
 export const persistHostPlan = async (
   db: Db,
   input: {
@@ -47,38 +89,19 @@ export const persistHostPlan = async (
     envelope: Envelope;
     sessionId?: string;
     sourceJob?: { id: string };
+    turnId?: string;
   }
 ): Promise<PersistedHostPlan> => {
   const decision = hostPlanDecisionSchema.parse(input.decision);
-  const requestedId = input.sessionId ?? input.envelope.sessionId;
-  const rows = requestedId
-    ? await db
-        .select()
-        .from(schema.sessions)
-        .where(eq(schema.sessions.id, requestedId))
-        .limit(1)
-    : [];
-  const existing = rows.at(0);
-  if (existing && existing.userId !== input.envelope.userId) {
-    throw new Error("Host session does not belong to envelope user");
-  }
-  if (decision.session.action !== "create" && !existing) {
-    throw new Error("Host selected a session that does not exist");
-  }
+  const existing = await getSelectedSession(db, input);
 
-  const sessionId =
-    decision.session.action === "create" || !existing
-      ? crypto.randomUUID()
-      : existing.id;
+  const sessionId = existing?.id ?? crypto.randomUUID();
   const baseRevision = existing?.revision ?? 0;
   const sessionRevision = baseRevision + 1;
   const planId = crypto.randomUUID();
   const timestamp = new Date().toISOString();
 
-  const nextStatus =
-    decision.conversation.state === "needs_clarification"
-      ? "awaiting_user"
-      : "active";
+  const nextStatus = getNextSessionStatus(decision);
   const results = await db.batch([
     existing
       ? db
@@ -125,6 +148,22 @@ export const persistHostPlan = async (
   ]);
   if (existing && results[0].meta.changes !== 1) {
     throw new Error("Host plan revision is stale");
+  }
+  if (input.turnId) {
+    await db.batch([
+      db
+        .update(schema.commerceTurns)
+        .set({ sessionId, updatedAt: timestamp })
+        .where(eq(schema.commerceTurns.id, input.turnId)),
+      db
+        .update(schema.messages)
+        .set({ sessionId })
+        .where(eq(schema.messages.turnId, input.turnId)),
+      db
+        .update(schema.jobs)
+        .set({ sessionId, updatedAt: timestamp })
+        .where(eq(schema.jobs.turnId, input.turnId)),
+    ]);
   }
 
   const eventPromises = [
@@ -178,6 +217,7 @@ export const persistHostSynthesis = async (
     plan: Awaited<ReturnType<typeof getHostPlan>>;
     session: typeof schema.sessions.$inferSelect;
     jobId: string;
+    turnId?: string;
   }
 ) => {
   const { decision } = input;
@@ -192,24 +232,34 @@ export const persistHostSynthesis = async (
     ...decision.assistantMessage.content,
     synthesisJobId: input.jobId,
   };
-  const existing = await db
-    .select()
-    .from(schema.messages)
-    .where(eq(schema.messages.sessionId, input.session.id));
-  if (
-    !existing.some((message) =>
-      message.contentJson.includes(`"synthesisJobId":"${input.jobId}"`)
-    )
-  ) {
-    await db.insert(schema.messages).values({
-      contentJson: JSON.stringify(content),
-      createdAt: new Date().toISOString(),
-      id: crypto.randomUUID(),
-      role: "assistant",
+  if (input.turnId) {
+    await completeTurnWithMessage(db, {
+      content,
+      outcome: "succeeded",
       sessionId: input.session.id,
+      turnId: input.turnId,
       type: decision.assistantMessage.type,
-      userId: input.session.userId,
     });
+  } else {
+    const existing = await db
+      .select()
+      .from(schema.messages)
+      .where(eq(schema.messages.sessionId, input.session.id));
+    if (
+      !existing.some((message) =>
+        message.contentJson.includes(`"synthesisJobId":"${input.jobId}"`)
+      )
+    ) {
+      await db.insert(schema.messages).values({
+        contentJson: JSON.stringify(content),
+        createdAt: new Date().toISOString(),
+        id: crypto.randomUUID(),
+        role: "assistant",
+        sessionId: input.session.id,
+        type: decision.assistantMessage.type,
+        userId: input.session.userId,
+      });
+    }
   }
   await db
     .update(schema.hostPlans)

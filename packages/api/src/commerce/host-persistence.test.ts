@@ -40,9 +40,9 @@ it("marks a self-dependent plan invalid", () => {
 });
 
 it("rejects delegation from a stale plan revision", () => {
-  expect(canDelegatePlan({ baseRevision: 4, sessionRevision: 5 })).toBe(false);
+  expect(canDelegatePlan({ baseRevision: 4, sessionRevision: 6 })).toBe(false);
 });
 
-it("allows delegation from the current revision", () => {
-  expect(canDelegatePlan({ baseRevision: 5, sessionRevision: 5 })).toBe(true);
+it("allows delegation from the revision created with the plan", () => {
+  expect(canDelegatePlan({ baseRevision: 5, sessionRevision: 6 })).toBe(true);
 });

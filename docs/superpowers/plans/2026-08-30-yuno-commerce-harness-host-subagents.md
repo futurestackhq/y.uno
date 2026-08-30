@@ -70,10 +70,12 @@
 ### Task 1: Extend DB schema for idempotency, delegation prompts, and job live output
 
 **Files:**
+
 - Modify: `packages/db/src/schema.ts`
 - Add: `packages/db/src/migrations/<timestamp>_harness_host_subagents.sql` (or generated via Drizzle)
 
 **Interfaces:**
+
 - Produces: new columns for `message_queue`, `jobs`, `execution_logs` required by later tasks.
 
 - [ ] **Step 1: Add `idempotency_key` to `message_queue`**
@@ -131,6 +133,7 @@ bun run dev:server
 ```
 
 Expected:
+
 - new migration file(s) exist under `packages/db/src/migrations`
 - `alchemy dev` applies them to the dev D1 database
 - the server and web workers come up successfully
@@ -147,10 +150,12 @@ git commit -m "feat(db): persist job prompts and live logs"
 ### Task 2: Standardize execution events helpers (session + job scoped)
 
 **Files:**
+
 - Modify: `packages/api/src/commerce/orchestrator.ts`
 - Create: `packages/api/src/commerce/events.ts`
 
 **Interfaces:**
+
 - Produces: `logEvent()` that can include `sessionId` and optional `jobId`, and optional `line`.
 
 - [ ] **Step 1: Create `ExecutionEvent` type**
@@ -192,6 +197,7 @@ eventType: ExecutionEvent["eventType"] | (string & {});
 ```
 
 This is allowed as long as:
+
 - planned event types remain present and used for core orchestration lifecycle
 - any extra event types are documented in `dataJson` payloads or follow a naming convention
 
@@ -253,10 +259,12 @@ git commit -m "feat(api): add job-scoped execution event helpers"
 ### Task 3: Add cheap “small talk / greeting” classifier (prevents “oi → catálogo”)
 
 **Files:**
+
 - Create: `packages/api/src/commerce/small-talk.ts`
 - Test: `packages/api/src/commerce/small-talk.test.ts`
 
 **Interfaces:**
+
 - Produces: `isSmallTalk(text: string): boolean`
 - Consumed by: dispatcher (Task 5)
 
@@ -325,10 +333,12 @@ git commit -m "feat(api): add small-talk gate for greetings"
 ### Task 4: Implement delegation prompt builders (host + per-job template)
 
 **Files:**
+
 - Create: `packages/api/src/commerce/prompts.ts`
 - Test: `packages/api/src/commerce/prompts.test.ts`
 
 **Interfaces:**
+
 - Produces:
   - `buildHostDecisionSummaryPrompt(...)` (optional, for later)
   - `buildDelegationPrompt(params: { kind: string; input: unknown; session: { id: string; intent: string } }): string`
@@ -419,10 +429,12 @@ git commit -m "feat(api): add deterministic delegation prompt builder"
 ### Task 5: Build a minimal plan DAG builder (pure)
 
 **Files:**
+
 - Create: `packages/api/src/commerce/plan.ts`
 - Test: `packages/api/src/commerce/plan.test.ts`
 
 **Interfaces:**
+
 - Produces: `buildPlan(intent: string): SessionPlan`
 - Consumed by: dispatcher (Task 6)
 
@@ -456,12 +468,7 @@ bun test packages/api/src/commerce/plan.test.ts
 ```ts
 // packages/api/src/commerce/plan.ts
 export type PlanNodeStatus =
-  | "pending"
-  | "ready"
-  | "running"
-  | "done"
-  | "failed"
-  | "blocked";
+  "pending" | "ready" | "running" | "done" | "failed" | "blocked";
 
 export type PlanNode = {
   id: string;
@@ -483,7 +490,12 @@ const nowIso = () => new Date().toISOString();
 export const buildPlan = (intent: string): SessionPlan => {
   const ts = nowIso();
   const nodes: PlanNode[] = [
-    { deps: [], id: "classify_intent", kind: "classify_intent", status: "ready" },
+    {
+      deps: [],
+      id: "classify_intent",
+      kind: "classify_intent",
+      status: "ready",
+    },
     {
       deps: ["classify_intent"],
       id: "rank_catalog",
@@ -520,10 +532,12 @@ git commit -m "feat(api): add minimal session plan DAG builder"
 ### Task 6: Refactor orchestrator into dispatcher (envelopes → plan/jobs/logs)
 
 **Files:**
+
 - Create: `packages/api/src/commerce/dispatcher.ts`
 - Modify: `packages/api/src/commerce/orchestrator.ts`
 
 **Interfaces:**
+
 - Produces:
   - `dispatchOnce(db: Db): Promise<{ processed: number }>`
   - `dispatchAll(db: Db, limit: number): Promise<{ processed: number }>`
@@ -595,6 +609,7 @@ export const dispatchOnce = async (db: Db) => {
 - [ ] **Step 2: Implement greeting path (“oi” friendly)**
 
 In `user_text`:
+
 - write the user message into `messages`
 - if `isSmallTalk(text)`: write a friendly assistant message and stop (no jobs)
 
@@ -611,13 +626,16 @@ Add a concrete handler (MVP):
 import { and, desc, eq } from "drizzle-orm";
 import type { Envelope } from "./types";
 
-const addMessage = async (db: Db, params: {
-  userId: string;
-  sessionId?: string;
-  role: "user" | "assistant" | "system";
-  type: "text" | "carousel" | "purchase_summary" | "receipt";
-  content: unknown;
-}) => {
+const addMessage = async (
+  db: Db,
+  params: {
+    userId: string;
+    sessionId?: string;
+    role: "user" | "assistant" | "system";
+    type: "text" | "carousel" | "purchase_summary" | "receipt";
+    content: unknown;
+  }
+) => {
   await db.insert(schema.messages).values({
     contentJson: JSON.stringify(params.content),
     createdAt: nowIso(),
@@ -657,7 +675,11 @@ const handleUserText = async (
   const sessionId = session?.id ?? crypto.randomUUID();
 
   await logEvent(db, {
-    data: { envelopeType: envelope.type, messageQueueId: meta.messageQueueId, text },
+    data: {
+      envelopeType: envelope.type,
+      messageQueueId: meta.messageQueueId,
+      text,
+    },
     eventType: "envelope_received",
     level: "info",
     sessionId,
@@ -683,7 +705,14 @@ const handleUserText = async (
       sessionId,
     });
     await logEvent(db, {
-      data: { planVersion: plan.version, nodes: plan.nodes.map((n) => ({ id: n.id, kind: n.kind, deps: n.deps })) },
+      data: {
+        planVersion: plan.version,
+        nodes: plan.nodes.map((n) => ({
+          id: n.id,
+          kind: n.kind,
+          deps: n.deps,
+        })),
+      },
       eventType: "plan_created",
       level: "info",
       sessionId,
@@ -739,7 +768,10 @@ const handleUserText = async (
   });
 
   await logEvent(db, {
-    data: { jobKind: "classify_intent", promptPreview: promptText.slice(0, 240) },
+    data: {
+      jobKind: "classify_intent",
+      promptPreview: promptText.slice(0, 240),
+    },
     eventType: "delegation_created",
     jobId,
     level: "info",
@@ -770,7 +802,11 @@ const handleQuickReply = async (
   });
 
   await addMessage(db, {
-    content: { quickReply: envelope.action, orderId: envelope.orderId, catalogItemId: envelope.catalogItemId },
+    content: {
+      quickReply: envelope.action,
+      orderId: envelope.orderId,
+      catalogItemId: envelope.catalogItemId,
+    },
     role: "user",
     sessionId: envelope.sessionId,
     type: "text",
@@ -778,7 +814,11 @@ const handleQuickReply = async (
   });
 
   await logEvent(db, {
-    data: { action: envelope.action, orderId: envelope.orderId, catalogItemId: envelope.catalogItemId },
+    data: {
+      action: envelope.action,
+      orderId: envelope.orderId,
+      catalogItemId: envelope.catalogItemId,
+    },
     eventType: "intent_detected",
     level: "info",
     sessionId: envelope.sessionId,
@@ -791,7 +831,11 @@ const handleCheckoutReturned = async (
   meta: { messageQueueId: string }
 ) => {
   await logEvent(db, {
-    data: { status: envelope.status, orderId: envelope.orderId, messageQueueId: meta.messageQueueId },
+    data: {
+      status: envelope.status,
+      orderId: envelope.orderId,
+      messageQueueId: meta.messageQueueId,
+    },
     eventType: "envelope_received",
     level: envelope.status === "paid" ? "info" : "warn",
     sessionId: envelope.sessionId,
@@ -809,6 +853,7 @@ const handleCheckoutReturned = async (
 - [ ] **Step 3: Implement session create/update + plan_json**
 
 On actionable `user_text`:
+
 - create/update `sessions` with `intent="unknown"` initially (or cheap detect)
 - set `sessions.plan_json` = `buildPlan("generic_request")` initially
 - emit `plan_created` event
@@ -816,6 +861,7 @@ On actionable `user_text`:
 - [ ] **Step 4: Enqueue first job as delegation (classify_intent)**
 
 Insert `jobs` row with:
+
 - `kind="classify_intent"`
 - `input_json` includes `{ text, sessionId, userId }`
 - `prompt_text = buildDelegationPrompt(...)`
@@ -823,6 +869,7 @@ Insert `jobs` row with:
 - `status="queued"`, `attempts=0`
 
 Also emit:
+
 - `delegation_created` (with `jobId` + prompt preview)
 - `job_queued`
 
@@ -847,10 +894,12 @@ git commit -m "feat(api): add dispatcher loop for envelopes to jobs"
 ### Task 7: Implement job runner (claim/lease/backoff) + core job kinds
 
 **Files:**
+
 - Create: `packages/api/src/commerce/job-runner.ts`
 - Modify: `packages/api/src/commerce/orchestrator.ts`
 
 **Interfaces:**
+
 - Produces:
   - `runJobsOnce(db, { limit }): Promise<{ ran: number }>`
 - Consumes:
@@ -860,6 +909,7 @@ git commit -m "feat(api): add dispatcher loop for envelopes to jobs"
 - [ ] **Step 1: Implement atomic-ish claim (SQLite)**
 
 Claim algorithm (MVP):
+
 - select one `queued` job with `next_run_at <= now` and (no lease OR lease expired)
 - update it to `running`, set `lease_expires_at = now + 60s`, increment `attempts`, set `started_at`
 
@@ -867,10 +917,7 @@ Code sketch:
 
 ```ts
 // packages/api/src/commerce/job-runner.ts
-export const runJobsOnce = async (
-  db: Db,
-  params: { limit: number }
-) => {
+export const runJobsOnce = async (db: Db, params: { limit: number }) => {
   let ran = 0;
   for (let i = 0; i < params.limit; i += 1) {
     const job = await claimNextJob(db);
@@ -887,27 +934,33 @@ export const runJobsOnce = async (
 For MVP, re-use existing `classifyIntentWithAi` logic but move it behind job execution.
 
 Emit:
+
 - `job_started` / progress lines / `job_done`
 
 Persist:
+
 - `jobs.result_json` with `{ intent, entities?, missing? }`
 
 - [ ] **Step 3: On job completion, update session plan + enqueue next job(s)**
 
 When `classify_intent` completes:
+
 - update `sessions.intent`
 - update `sessions.plan_json` node statuses
 - enqueue `rank_catalog` job
 
 When `rank_catalog` completes:
+
 - enqueue `compose_reply` job
 
 When `compose_reply` completes:
+
 - write an assistant message (carousel/text)
 
 - [ ] **Step 4: Implement bounded retry/backoff**
 
 Retry policy:
+
 - max attempts: 3
 - backoff: 2s, 5s, 12s
 - set `jobs.next_run_at`
@@ -925,11 +978,13 @@ git commit -m "feat(api): add job runner with lease and backoff"
 ### Task 8: Add “heartbeat” via `ExecutionContext.waitUntil()` (no manual UI tick)
 
 **Files:**
+
 - Modify: `packages/api/src/context.ts`
 - Modify: `packages/api/src/routers/commerce.ts`
 - Create: `packages/api/src/commerce/process.ts`
 
 **Interfaces:**
+
 - Produces: request-triggered background processing using `ExecutionContext.waitUntil()` (no manual UI tick).
 
 - [ ] **Step 1: Expose `executionCtx` in API context**
@@ -938,7 +993,9 @@ Update context to pass Worker execution context through:
 
 ```ts
 // packages/api/src/context.ts
-export const createContext = async function createContext(options: CreateContextOptions) {
+export const createContext = async function createContext(
+  options: CreateContextOptions
+) {
   const db = createDb();
   await Promise.resolve();
 
@@ -990,6 +1047,7 @@ sendEnvelope: publicProcedure
 - [ ] **Step 4: Manual verification**
 
 In dev/prod:
+
 - send an envelope
 - do **not** call tick
 - confirm sessions/messages progress and `execution_logs` fills over time
@@ -1006,9 +1064,11 @@ git commit -m "feat(api): process envelopes/jobs in background via waitUntil"
 ### Task 9: Expand tRPC API for Inspector + Subagents Live (no UI tick)
 
 **Files:**
+
 - Modify: `packages/api/src/routers/commerce.ts`
 
 **Interfaces:**
+
 - Produces:
   - `commerce.getSessionInspector({ sessionId })` → session + plan + job summary + delegations list
   - `commerce.getJobLogs({ jobId })` → execution logs for that job
@@ -1020,8 +1080,22 @@ Return shape:
 
 ```ts
 type SessionInspector = {
-  session: { id: string; intent: string; status: string; updatedAt: string; planJson: string };
-  jobs: Array<{ id: string; kind: string; status: string; attempts: number; startedAt: string | null; finishedAt: string | null; subagentName: string | null }>;
+  session: {
+    id: string;
+    intent: string;
+    status: string;
+    updatedAt: string;
+    planJson: string;
+  };
+  jobs: Array<{
+    id: string;
+    kind: string;
+    status: string;
+    attempts: number;
+    startedAt: string | null;
+    finishedAt: string | null;
+    subagentName: string | null;
+  }>;
   jobCounts: { queued: number; running: number; done: number; failed: number };
 };
 ```
@@ -1042,6 +1116,7 @@ git commit -m "feat(api): add inspector and job log queries"
 ### Task 10: UI layout + accordions + debounced polling + typing indicator
 
 **Files:**
+
 - Modify: `apps/web/src/routes/_dashboard/commerce/index.tsx`
 - Modify: `apps/web/src/commerce/chat-panel.tsx`
 - Create: `apps/web/src/commerce/session-inspector-panel.tsx`
@@ -1050,6 +1125,7 @@ git commit -m "feat(api): add inspector and job log queries"
 - Create: `apps/web/src/commerce/subagents-live-panel.tsx`
 
 **Interfaces:**
+
 - Consumes:
   - `trpc.commerce.getSessionInspector`
   - `trpc.commerce.getJobLogs`
@@ -1063,12 +1139,14 @@ git commit -m "feat(api): add inspector and job log queries"
 - [ ] **Step 1: Replace the middle panel with Session Inspector**
 
 In `index.tsx`, replace SessionsPanel+LogsPanel with:
+
 - middle: `SessionInspectorPanel`
 - right: `SubagentsLivePanel`
 
 - [ ] **Step 2: Implement debounced polling using React Query `refetchInterval`**
 
 Pattern:
+
 - query `pendingWork` every 500ms **only when pending**
 - use that signal to set `refetchInterval` for inspector/jobs/logs queries
 
@@ -1088,12 +1166,12 @@ Default-open; each job row collapsed summary + expand shows prompt/input/output.
 
 - [ ] **Step 5: Implement Subagents Live panel**
 
-Default selection: most recent running job else most recent finished.
-Render logs (job_progress lines) in a terminal-like block.
+Default selection: most recent running job else most recent finished. Render logs (job_progress lines) in a terminal-like block.
 
 - [ ] **Step 6: Manual verification**
 
 In `/commerce`:
+
 - send “oi” → friendly reply, no catalog
 - send product intent → see Delegations open and Subagents Live updates while running
 
@@ -1109,12 +1187,14 @@ git commit -m "feat(web): add inspector and subagents live panels"
 ### Task 11: Install AI Elements primitives (Tool/Terminal/Task) and wire into panels
 
 **Files:**
+
 - Create: `apps/web/src/components/ai-elements/*` (generated)
 - Modify: `apps/web/package.json`
 - Modify: `apps/web/src/commerce/subagents-live-panel.tsx`
 - Modify: `apps/web/src/commerce/delegations-accordion.tsx`
 
 **Interfaces:**
+
 - Produces: consistent minified rendering of tool/log blocks.
 
 - [ ] **Step 1: Install Terminal/Tool/Task components**
@@ -1129,6 +1209,7 @@ bunx --bun ai-elements@latest add task
 ```
 
 Expected:
+
 - files created under `apps/web/src/components/ai-elements/`
 - dependencies added to `apps/web/package.json`
 
@@ -1139,12 +1220,13 @@ Example:
 ```tsx
 import { Terminal } from "@/components/ai-elements/terminal";
 
-<Terminal autoScroll isStreaming={isStreaming} output={ansiOutput} />
+<Terminal autoScroll isStreaming={isStreaming} output={ansiOutput} />;
 ```
 
 - [ ] **Step 3: Use `<Tool />` for expanded delegation details**
 
 When job has `prompt_text` + `result_json`:
+
 - map to a Tool-like view (input=prompt/input, output=result/error)
 
 - [ ] **Step 4: Commit**
@@ -1172,4 +1254,3 @@ Plan complete and saved to `docs/superpowers/plans/2026-08-30-yuno-commerce-harn
 2. **Inline Execution** - Execute tasks in this session using executing-plans, batch execution with checkpoints
 
 Which approach?
-

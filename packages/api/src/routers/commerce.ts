@@ -66,6 +66,26 @@ export const serializeCurrentHostPlan = (
     : null;
 
 export const commerceRouter = router({
+  getDefaultPaymentMethod: publicProcedure
+    .input(userIdInput)
+    .query(async ({ ctx }) => {
+      const [paymentMethod] = await ctx.db
+        .select({
+          brand: schema.paymentMethods.brand,
+          last4: schema.paymentMethods.last4,
+          token: schema.paymentMethods.token,
+        })
+        .from(schema.paymentMethods)
+        .where(
+          and(
+            eq(schema.paymentMethods.userId, DEMO_USER_ID),
+            eq(schema.paymentMethods.isDefault, true)
+          )
+        )
+        .orderBy(desc(schema.paymentMethods.createdAt))
+        .limit(1);
+      return paymentMethod ?? null;
+    }),
   getJobLogs: publicProcedure.input(jobLogsInput).query(
     async ({ ctx, input }) =>
       await ctx.db
