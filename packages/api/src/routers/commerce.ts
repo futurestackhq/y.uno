@@ -12,6 +12,7 @@ import {
 } from "../commerce/orchestrator";
 import { processWork } from "../commerce/process";
 import { resetCommerceDemoData } from "../commerce/reset";
+import { seedDemoData } from "../commerce/seed";
 import { envelopeSchema } from "../commerce/types";
 import { publicProcedure, router } from "../index";
 
@@ -382,7 +383,11 @@ export const commerceRouter = router({
     .input(userIdInput)
     .query(async ({ ctx }) => await listSessions(ctx.db, DEMO_USER_ID)),
   resetDemoData: publicProcedure.mutation(
-    async ({ ctx }) => await resetCommerceDemoData(ctx.db)
+    async ({ ctx }) => {
+      await resetCommerceDemoData(ctx.db);
+      await seedDemoData(ctx.db);
+      return { ok: true } as const;
+    }
   ),
   sendEnvelope: publicProcedure
     .input(envelopeSchema)
