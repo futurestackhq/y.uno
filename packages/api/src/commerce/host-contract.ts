@@ -246,7 +246,9 @@ export const hostSynthesisOutputSchema = z
               catalogItemId: z.string().min(1).max(200).nullable(),
               ctas: carouselCtaSchema,
               id: z.string().min(1).max(200),
-              imageUrl: z.string().url().nullable(),
+              // OpenAI structured outputs reject the JSON Schema `uri` format
+              // emitted by z.string().url(), so validate only the presence here.
+              imageUrl: z.string().min(1).max(2_000).nullable(),
               merchant: z.string().min(1).max(200),
               price: z.string().min(1).max(120),
               subtitle: z.string().max(500).nullable(),
