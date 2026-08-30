@@ -5,8 +5,8 @@ import { buildDelegationPrompt } from "./prompts";
 describe("buildDelegationPrompt", () => {
   it("includes stable header and expected output contract", () => {
     const prompt = buildDelegationPrompt({
-      kind: "classify_intent",
       input: { text: "quero ração" },
+      kind: "classify_intent",
       session: { id: "sess_1", intent: "unknown" },
     });
 
@@ -25,14 +25,14 @@ describe("buildDelegationPrompt", () => {
 
   it("is deterministic for object key ordering", () => {
     const a = buildDelegationPrompt({
+      input: { a: 1, b: 2, nested: { x: 1, y: 2 } },
       kind: "rank_candidates",
-      input: { b: 2, a: 1, nested: { y: 2, x: 1 } },
       session: { id: "sess_det", intent: "product_pet_food" },
     });
 
     const b = buildDelegationPrompt({
-      kind: "rank_candidates",
       input: { a: 1, b: 2, nested: { x: 1, y: 2 } },
+      kind: "rank_candidates",
       session: { id: "sess_det", intent: "product_pet_food" },
     });
 
@@ -44,8 +44,8 @@ describe("buildDelegationPrompt", () => {
     obj.self = obj;
 
     const prompt = buildDelegationPrompt({
-      kind: "cycle_check",
       input: obj,
+      kind: "cycle_check",
       session: { id: "sess_cycle", intent: "unknown" },
     });
 
@@ -57,8 +57,8 @@ describe("buildDelegationPrompt", () => {
     arr.push(arr);
 
     const prompt = buildDelegationPrompt({
-      kind: "cycle_check_array",
       input: arr,
+      kind: "cycle_check_array",
       session: { id: "sess_cycle_arr", intent: "unknown" },
     });
 
