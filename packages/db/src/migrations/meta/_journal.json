@@ -8,6 +8,13 @@
       "when": 1788052564869,
       "tag": "0000_last_thunderbird",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1788063016756,
+      "tag": "0001_curious_adam_destine",
+      "breakpoints": true
     }
   ]
 }

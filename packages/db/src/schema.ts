@@ -3,39 +3,42 @@ import { integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
 const now = () => new Date().toISOString();
 
 export const users = sqliteTable("users", {
-  id: text("id").primaryKey(),
-  displayName: text("display_name").notNull(),
   createdAt: text("created_at").notNull().$defaultFn(now),
+  displayName: text("display_name").notNull(),
+  id: text("id").primaryKey(),
 });
 
 export const connections = sqliteTable("connections", {
-  id: text("id").primaryKey(),
-  slug: text("slug").notNull(),
-  displayName: text("display_name").notNull(),
-  type: text("type", { enum: ["product", "service"] }).notNull(),
   commissionBps: integer("commission_bps").notNull(),
-  slaMinutesDefault: integer("sla_minutes_default").notNull(),
   createdAt: text("created_at").notNull().$defaultFn(now),
+  displayName: text("display_name").notNull(),
+  id: text("id").primaryKey(),
+  slaMinutesDefault: integer("sla_minutes_default").notNull(),
+  slug: text("slug").notNull(),
+  type: text("type", { enum: ["product", "service"] }).notNull(),
 });
 
 export const connectionCatalogItems = sqliteTable("connection_catalog_items", {
-  id: text("id").primaryKey(),
-  connectionId: text("connection_id").notNull(),
-  kind: text("kind", { enum: ["sku", "service"] }).notNull(),
-  title: text("title").notNull(),
-  subtitle: text("subtitle"),
-  priceCents: integer("price_cents").notNull(),
-  currency: text("currency").notNull(),
-  imageUrl: text("image_url"),
   attributesJson: text("attributes_json").notNull(),
-  isActive: integer("is_active", { mode: "boolean" }).notNull(),
+  connectionId: text("connection_id").notNull(),
   createdAt: text("created_at").notNull().$defaultFn(now),
+  currency: text("currency").notNull(),
+  id: text("id").primaryKey(),
+  imageUrl: text("image_url"),
+  isActive: integer("is_active", { mode: "boolean" }).notNull(),
+  kind: text("kind", { enum: ["sku", "service"] }).notNull(),
+  priceCents: integer("price_cents").notNull(),
+  subtitle: text("subtitle"),
+  title: text("title").notNull(),
 });
 
 export const sessions = sqliteTable("sessions", {
+  createdAt: text("created_at").notNull().$defaultFn(now),
+  expiresAt: text("expires_at"),
   id: text("id").primaryKey(),
-  userId: text("user_id").notNull(),
   intent: text("intent").notNull(),
+  planJson: text("plan_json").notNull(),
+  requirementsJson: text("requirements_json").notNull(),
   status: text("status", {
     enum: [
       "active",
@@ -46,18 +49,16 @@ export const sessions = sqliteTable("sessions", {
       "failed",
     ],
   }).notNull(),
-  requirementsJson: text("requirements_json").notNull(),
-  planJson: text("plan_json").notNull(),
-  createdAt: text("created_at").notNull().$defaultFn(now),
   updatedAt: text("updated_at").notNull().$defaultFn(now),
-  expiresAt: text("expires_at"),
+  userId: text("user_id").notNull(),
 });
 
 export const messages = sqliteTable("messages", {
+  contentJson: text("content_json").notNull(),
+  createdAt: text("created_at").notNull().$defaultFn(now),
   id: text("id").primaryKey(),
-  userId: text("user_id").notNull(),
-  sessionId: text("session_id"),
   role: text("role", { enum: ["user", "assistant", "system"] }).notNull(),
+  sessionId: text("session_id"),
   type: text("type", {
     enum: [
       "text",
@@ -68,74 +69,97 @@ export const messages = sqliteTable("messages", {
       "purchase_summary",
     ],
   }).notNull(),
-  contentJson: text("content_json").notNull(),
-  createdAt: text("created_at").notNull().$defaultFn(now),
+  userId: text("user_id").notNull(),
 });
 
 export const messageQueue = sqliteTable("message_queue", {
+  error: text("error"),
   id: text("id").primaryKey(),
-  userId: text("user_id").notNull(),
-  receivedAt: text("received_at").notNull().$defaultFn(now),
-  type: text("type").notNull(),
+  idempotencyKey: text("idempotency_key"),
   payloadJson: text("payload_json").notNull(),
+  receivedAt: text("received_at").notNull().$defaultFn(now),
   status: text("status", {
     enum: ["pending", "processing", "done", "failed"],
   }).notNull(),
-  error: text("error"),
+  type: text("type").notNull(),
+  userId: text("user_id").notNull(),
 });
 
 export const jobs = sqliteTable("jobs", {
+  attempts: integer("attempts").notNull(),
+  createdAt: text("created_at").notNull().$defaultFn(now),
   id: text("id").primaryKey(),
-  sessionId: text("session_id").notNull(),
-  kind: text("kind").notNull(),
   inputJson: text("input_json").notNull(),
+  kind: text("kind").notNull(),
+  leaseExpiresAt: text("lease_expires_at"),
+  promptText: text("prompt_text"),
+  resultJson: text("result_json"),
+  errorText: text("error_text"),
+  startedAt: text("started_at"),
+  finishedAt: text("finished_at"),
+  nextRunAt: text("next_run_at"),
+  sessionId: text("session_id").notNull(),
   status: text("status", {
     enum: ["queued", "running", "done", "failed"],
   }).notNull(),
-  leaseExpiresAt: text("lease_expires_at"),
-  attempts: integer("attempts").notNull(),
-  createdAt: text("created_at").notNull().$defaultFn(now),
+  subagentName: text("subagent_name"),
   updatedAt: text("updated_at").notNull().$defaultFn(now),
 });
 
 export const executionLogs = sqliteTable("execution_logs", {
-  id: text("id").primaryKey(),
-  sessionId: text("session_id").notNull(),
-  level: text("level", { enum: ["info", "warn", "error"] }).notNull(),
-  eventType: text("event_type").notNull(),
-  dataJson: text("data_json").notNull(),
   createdAt: text("created_at").notNull().$defaultFn(now),
+  dataJson: text("data_json").notNull(),
+  eventType: text("event_type").notNull(),
+  id: text("id").primaryKey(),
+  jobId: text("job_id"),
+  level: text("level", { enum: ["info", "warn", "error"] }).notNull(),
+  line: text("line"),
+  sessionId: text("session_id").notNull(),
 });
 
 export const orders = sqliteTable("orders", {
-  id: text("id").primaryKey(),
-  sessionId: text("session_id").notNull(),
   connectionId: text("connection_id").notNull(),
+  createdAt: text("created_at").notNull().$defaultFn(now),
+  currency: text("currency").notNull(),
+  id: text("id").primaryKey(),
   paymentMethodId: text("payment_method_id"),
+  sessionId: text("session_id").notNull(),
   status: text("status", {
     enum: ["draft", "checkout_started", "paid", "failed", "fulfilled"],
   }).notNull(),
   totalCents: integer("total_cents").notNull(),
-  currency: text("currency").notNull(),
-  createdAt: text("created_at").notNull().$defaultFn(now),
   updatedAt: text("updated_at").notNull().$defaultFn(now),
 });
 
 export const orderItems = sqliteTable("order_items", {
-  id: text("id").primaryKey(),
-  orderId: text("order_id").notNull(),
   catalogItemId: text("catalog_item_id").notNull(),
+  id: text("id").primaryKey(),
+  lineTotalCents: integer("line_total_cents").notNull(),
+  orderId: text("order_id").notNull(),
   qty: integer("qty").notNull(),
   unitPriceCents: integer("unit_price_cents").notNull(),
-  lineTotalCents: integer("line_total_cents").notNull(),
 });
 
 export const paymentMethods = sqliteTable("payment_methods", {
-  id: text("id").primaryKey(),
-  userId: text("user_id").notNull(),
-  token: text("token").notNull(),
   brand: text("brand").notNull(),
-  last4: text("last4").notNull(),
-  isDefault: integer("is_default", { mode: "boolean" }).notNull(),
   createdAt: text("created_at").notNull().$defaultFn(now),
+  id: text("id").primaryKey(),
+  isDefault: integer("is_default", { mode: "boolean" }).notNull(),
+  last4: text("last4").notNull(),
+  token: text("token").notNull(),
+  userId: text("user_id").notNull(),
 });
+
+export const schema = {
+  connectionCatalogItems,
+  connections,
+  executionLogs,
+  jobs,
+  messageQueue,
+  messages,
+  orderItems,
+  orders,
+  paymentMethods,
+  sessions,
+  users,
+} as const;
