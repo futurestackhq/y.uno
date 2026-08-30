@@ -163,6 +163,8 @@ export type ExecutionEvent = {
   sessionId: string;
   jobId?: string;
   level: ExecutionEventLevel;
+  // MVP note: we keep the core planned event types strongly typed, but allow
+  // commerce-specific event strings while we migrate legacy event names.
   eventType:
     | "envelope_received"
     | "session_created"
@@ -181,6 +183,18 @@ export type ExecutionEvent = {
 };
 ```
 
+- [ ] **Step 1.1 (MVP reality): allow commerce-specific event strings**
+
+Because the branch already has legacy commerce events (e.g. `"carousel_rendered"`) and we want to preserve observability during migration, implementers may widen `eventType` to:
+
+```ts
+eventType: ExecutionEvent["eventType"] | (string & {});
+```
+
+This is allowed as long as:
+- planned event types remain present and used for core orchestration lifecycle
+- any extra event types are documented in `dataJson` payloads or follow a naming convention
+
 - [ ] **Step 2: Implement `logEvent(db, event)` writing `jobId` + `line`**
 
 ```ts
@@ -198,7 +212,8 @@ export const logEvent = async (db: Db, event: ExecutionEvent) => {
     id: crypto.randomUUID(),
     jobId: event.jobId,
     level: event.level,
-    line: event.line,
+    // Preserve empty string and truncate to 1000 chars.
+    line: event.line?.slice(0, 1000),
     sessionId: event.sessionId,
   });
 };
@@ -221,6 +236,10 @@ export const logProgressLine = async (
   });
 };
 ```
+
+- [ ] **Step 3.1 (Branch hygiene): ensure `packages/api/src/commerce/*` is tracked**
+
+If `packages/api/src/routers/commerce.ts` imports `../commerce/orchestrator`, ensure the referenced modules are committed so a clean checkout builds (even if they were previously present but untracked locally). Keep this change as small as possible: do not refactor logic in this task.
 
 - [ ] **Step 4: Commit**
 
