@@ -290,9 +290,9 @@ const handleQuickReply = async (
     sessionId: envelope.sessionId,
   });
 
-  if (envelope.action === "details") {
+  if (envelope.action === "details" || envelope.action === "buy") {
     if (!envelope.catalogItemId) {
-      throw new Error("Product details require a catalog item");
+      throw new Error("Product action requires a catalog item");
     }
     const [item] = await db
       .select()
@@ -302,11 +302,58 @@ const handleQuickReply = async (
     if (!item) {
       throw new Error("Catalog item not found");
     }
+    const [connection] = await db
+      .select({ displayName: schema.connections.displayName })
+      .from(schema.connections)
+      .where(eq(schema.connections.id, item.connectionId))
+      .limit(1);
 
     const formattedPrice = new Intl.NumberFormat("pt-BR", {
       currency: item.currency,
       style: "currency",
     }).format(item.priceCents / 100);
+    if (envelope.action === "buy") {
+      const orderId = crypto.randomUUID();
+      const timestamp = nowIso();
+      await db.batch([
+        db.insert(schema.orders).values({
+          connectionId: item.connectionId,
+          createdAt: timestamp,
+          currency: item.currency,
+          id: orderId,
+          paymentMethodId: null,
+          sessionId: session.id,
+          status: "draft",
+          totalCents: item.priceCents,
+          updatedAt: timestamp,
+        }),
+        db.insert(schema.orderItems).values({
+          catalogItemId: item.id,
+          id: crypto.randomUUID(),
+          lineTotalCents: item.priceCents,
+          orderId,
+          qty: 1,
+          unitPriceCents: item.priceCents,
+        }),
+      ]);
+      await completeTurnWithMessage(db, {
+        content: {
+          buttons: [{ action: "confirm_payment", label: "Confirmar compra" }],
+          merchant: connection?.displayName ?? item.connectionId,
+          orderId,
+          paymentHint: "Informe seu cartão para concluir o pagamento.",
+          subtitle: `1 unidade de ${item.title}`,
+          title: "Pedido criado",
+          total: formattedPrice,
+        },
+        outcome: "succeeded",
+        sessionId: session.id,
+        turnId: meta.turnId,
+        type: "purchase_summary",
+      });
+      return;
+    }
+
     await completeTurnWithMessage(db, {
       content: {
         text: [item.title, item.subtitle, formattedPrice]

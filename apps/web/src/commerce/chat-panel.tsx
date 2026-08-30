@@ -412,15 +412,6 @@ export const ChatPanel = (props: {
                                   if (disabled) {
                                     return;
                                   }
-                                  await sendEnvelope({
-                                    payload: {
-                                      action: b.action,
-                                      orderId: purchaseSummary.orderId,
-                                      sessionId,
-                                    },
-                                    type: "quick_reply",
-                                  });
-
                                   const opensCheckout =
                                     b.action === "confirm_payment" ||
                                     b.action === "swap_card" ||
@@ -431,12 +422,23 @@ export const ChatPanel = (props: {
                                       purchaseSummary.orderId,
                                       sessionId
                                     );
-                                  } else if (b.action === "pay_now") {
+                                    return;
+                                  }
+                                  if (b.action === "pay_now") {
                                     await onPayWithSavedCard(
                                       purchaseSummary.orderId,
                                       sessionId
                                     );
+                                    return;
                                   }
+                                  await sendEnvelope({
+                                    payload: {
+                                      action: b.action,
+                                      orderId: purchaseSummary.orderId,
+                                      sessionId,
+                                    },
+                                    type: "quick_reply",
+                                  });
                                 }}
                                 size="sm"
                                 type="button"
