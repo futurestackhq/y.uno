@@ -199,4 +199,56 @@ describe("host contracts", () => {
       })
     ).toBeTruthy();
   });
+
+  it("requires product carousel cards to include details and buy CTAs", () => {
+    const carousel = {
+      assistantMessage: {
+        content: {
+          buttons: [],
+          cards: [
+            {
+              catalogItemId: "sku_1",
+              ctas: [
+                { action: "details", label: "Ver detalhes" },
+                { action: "buy", label: "Comprar" },
+              ],
+              id: "sku_1",
+              merchant: "Pet store",
+              price: "R$ 89,90",
+              subtitle: null,
+              title: "Ração",
+            },
+          ],
+          merchant: null,
+          orderId: null,
+          paymentHint: null,
+          subtitle: null,
+          text: null,
+          title: "Opções para seu pet",
+          total: null,
+        },
+        type: "carousel",
+      },
+      nextAction: "await_user",
+    };
+
+    expect(hostSynthesisOutputSchema.parse(carousel)).toBeTruthy();
+    expect(() =>
+      hostSynthesisOutputSchema.parse({
+        ...carousel,
+        assistantMessage: {
+          ...carousel.assistantMessage,
+          content: {
+            ...carousel.assistantMessage.content,
+            cards: [
+              {
+                ...carousel.assistantMessage.content.cards[0],
+                ctas: [],
+              },
+            ],
+          },
+        },
+      })
+    ).toThrow("Too small: expected array to have >=2 items");
+  });
 });

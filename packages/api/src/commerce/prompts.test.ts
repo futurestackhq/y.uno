@@ -1,6 +1,10 @@
 import { describe, expect, it } from "bun:test";
 
-import { buildDelegationPrompt, buildHostPlanningPrompt } from "./prompts";
+import {
+  buildDelegationPrompt,
+  buildHostPlanningPrompt,
+  buildHostSynthesisPrompt,
+} from "./prompts";
 
 describe("buildHostPlanningPrompt", () => {
   it("requires concise marketplace responses for social turns", () => {
@@ -77,5 +81,14 @@ describe("buildDelegationPrompt", () => {
 
     expect(prompt).toContain("[Circular]");
     expect(prompt).toContain("Input JSON:");
+  });
+});
+
+describe("buildHostSynthesisPrompt", () => {
+  it("requires details and purchase actions for carousel cards", () => {
+    const prompt = buildHostSynthesisPrompt({ context: {} });
+
+    expect(prompt).toContain('"details", label: "Ver detalhes"');
+    expect(prompt).toContain('"buy", label: "Comprar"');
   });
 });

@@ -222,6 +222,19 @@ const hostActionSchema = z.object({
   label: z.string().min(1).max(120),
 });
 
+const carouselCtaSchema = z
+  .array(hostActionSchema)
+  .length(2)
+  .superRefine((ctas, context) => {
+    const actions = new Set(ctas.map((cta) => cta.action));
+    if (!actions.has("details") || !actions.has("buy")) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Carousel cards must provide details and buy actions",
+      });
+    }
+  });
+
 export const hostSynthesisOutputSchema = z
   .object({
     assistantMessage: z.object({
@@ -231,7 +244,7 @@ export const hostSynthesisOutputSchema = z
           .array(
             z.object({
               catalogItemId: z.string().min(1).max(200).nullable(),
-              ctas: z.array(hostActionSchema).max(4),
+              ctas: carouselCtaSchema,
               id: z.string().min(1).max(200),
               merchant: z.string().min(1).max(200),
               price: z.string().min(1).max(120),

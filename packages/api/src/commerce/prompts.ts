@@ -135,6 +135,7 @@ export const buildHostSynthesisPrompt = (params: HostPromptParams): string =>
     "Return only the configured structured output.",
     "Write a concise, user-facing assistant message.",
     "Fill content fields used by the selected message type; use empty arrays or null for every unrelated field.",
+    'For every carousel card, return exactly two CTAs: { action: "details", label: "Ver detalhes" } and { action: "buy", label: "Comprar" }.',
     "Never expose private reasoning or internal operational details.",
     "",
     "Synthesis context:",
