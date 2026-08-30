@@ -147,13 +147,16 @@ const handleUserText = async (
   meta: { messageQueueId: string }
 ) => {
   const text = envelope.text.trim();
-  const session = await ensureSession(db, {
-    requestedSessionId: envelope.sessionId,
-    userId: envelope.userId,
-  });
-  if (!session) {
-    throw new Error("Failed to create commerce session");
-  }
+  const session =
+    (await ensureSession(db, {
+      requestedSessionId: envelope.sessionId,
+      userId: envelope.userId,
+    })) ??
+    // If something went wrong when creating the session, fall back to a stable id for logs.
+    ({
+      id: envelope.sessionId ?? crypto.randomUUID(),
+      intent: "unknown",
+    } as const);
 
   await logEvent(db, {
     data: {
