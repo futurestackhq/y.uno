@@ -290,6 +290,37 @@ const handleQuickReply = async (
     sessionId: envelope.sessionId,
   });
 
+  if (envelope.action === "details") {
+    if (!envelope.catalogItemId) {
+      throw new Error("Product details require a catalog item");
+    }
+    const [item] = await db
+      .select()
+      .from(schema.connectionCatalogItems)
+      .where(eq(schema.connectionCatalogItems.id, envelope.catalogItemId))
+      .limit(1);
+    if (!item) {
+      throw new Error("Catalog item not found");
+    }
+
+    const formattedPrice = new Intl.NumberFormat("pt-BR", {
+      currency: item.currency,
+      style: "currency",
+    }).format(item.priceCents / 100);
+    await completeTurnWithMessage(db, {
+      content: {
+        text: [item.title, item.subtitle, formattedPrice]
+          .filter((part): part is string => Boolean(part))
+          .join("\n"),
+      },
+      outcome: "succeeded",
+      sessionId: session.id,
+      turnId: meta.turnId,
+      type: "text",
+    });
+    return;
+  }
+
   // oxlint-disable-next-line no-use-before-define
   await enqueueInboundHostFollowUp(
     db,
