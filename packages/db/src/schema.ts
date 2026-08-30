@@ -38,12 +38,14 @@ export const connectionCatalogItems = sqliteTable("connection_catalog_items", {
 });
 
 export const sessions = sqliteTable("sessions", {
+  contextJson: text("context_json").notNull().default("{}"),
   createdAt: text("created_at").notNull().$defaultFn(now),
   expiresAt: text("expires_at"),
   id: text("id").primaryKey(),
   intent: text("intent").notNull(),
   planJson: text("plan_json").notNull(),
   requirementsJson: text("requirements_json").notNull(),
+  revision: integer("revision").notNull().default(0),
   status: text("status", {
     enum: [
       "active",
@@ -57,6 +59,28 @@ export const sessions = sqliteTable("sessions", {
   updatedAt: text("updated_at").notNull().$defaultFn(now),
   userId: text("user_id").notNull(),
 });
+
+export const hostPlans = sqliteTable(
+  "host_plans",
+  {
+    baseRevision: integer("base_revision").notNull(),
+    createdAt: text("created_at").notNull().$defaultFn(now),
+    decisionJson: text("decision_json").notNull(),
+    decisionSummary: text("decision_summary").notNull(),
+    id: text("id").primaryKey(),
+    sessionId: text("session_id").notNull(),
+    status: text("status", {
+      enum: ["persisted", "delegated", "superseded", "completed", "failed"],
+    }).notNull(),
+    updatedAt: text("updated_at").notNull().$defaultFn(now),
+  },
+  (table) => ({
+    sessionRevisionUnique: uniqueIndex("host_plans_session_revision_unique").on(
+      table.sessionId,
+      table.baseRevision
+    ),
+  })
+);
 
 export const messages = sqliteTable("messages", {
   contentJson: text("content_json").notNull(),
@@ -101,17 +125,19 @@ export const messageQueue = sqliteTable(
 export const jobs = sqliteTable("jobs", {
   attempts: integer("attempts").notNull(),
   createdAt: text("created_at").notNull().$defaultFn(now),
+  errorText: text("error_text"),
+  finishedAt: text("finished_at"),
   id: text("id").primaryKey(),
   inputJson: text("input_json").notNull(),
   kind: text("kind").notNull(),
   leaseExpiresAt: text("lease_expires_at"),
+  nextRunAt: text("next_run_at"),
+  nodeId: text("node_id"),
+  planId: text("plan_id"),
   promptText: text("prompt_text"),
   resultJson: text("result_json"),
-  errorText: text("error_text"),
-  startedAt: text("started_at"),
-  finishedAt: text("finished_at"),
-  nextRunAt: text("next_run_at"),
   sessionId: text("session_id").notNull(),
+  startedAt: text("started_at"),
   status: text("status", {
     enum: ["queued", "running", "done", "failed"],
   }).notNull(),
@@ -167,6 +193,7 @@ export const schema = {
   connectionCatalogItems,
   connections,
   executionLogs,
+  hostPlans,
   jobs,
   messageQueue,
   messages,

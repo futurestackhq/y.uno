@@ -9,10 +9,19 @@ export const commerceResetTableNames = [
   "jobs",
   "messages",
   "message_queue",
+  "host_plans",
   "sessions",
   "connection_catalog_items",
   "connections",
 ] as const;
+
+export const canDelegatePlan = ({
+  baseRevision,
+  sessionRevision,
+}: {
+  baseRevision: number;
+  sessionRevision: number;
+}) => baseRevision === sessionRevision;
 
 /**
  * Clears only commerce-owned state. D1 batches are atomic, and every delete is
@@ -28,6 +37,7 @@ export const resetCommerceDemoData = async (db: Db) => {
     db.delete(schema.jobs),
     db.delete(schema.messages),
     db.delete(schema.messageQueue),
+    db.delete(schema.hostPlans),
     db.delete(schema.sessions),
     db.delete(schema.connectionCatalogItems),
     db.delete(schema.connections),
