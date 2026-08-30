@@ -18,7 +18,7 @@ production code still imports the real Worker runtime module unchanged.
 
 ## Commit
 
-Pending commit for the scoped runtime setup and verification test.
+Committed as `9c5b8f3` (`fix(test): mock Worker env for Bun commerce tests`).
 
 ## Concerns
 
