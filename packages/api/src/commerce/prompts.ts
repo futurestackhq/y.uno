@@ -6,76 +6,59 @@ type DelegationPromptParams = {
   session: SessionLite;
 };
 
-const normalizeJsonValue = (value: unknown, seen: WeakSet<object>): unknown => {
-  if (value === null) {
-    return null;
-  }
+const compareStringKeys = (a: string, b: string): number => {
+  if (a < b) return -1;
+  if (a > b) return 1;
+  return 0;
+};
+
+const isPlainObject = (value: object): value is Record<string, unknown> => {
+  const proto = Object.getPrototypeOf(value);
+  return proto === Object.prototype || proto === null;
+};
+
+const normalizeJsonValue = (
+  value: unknown,
+  stack: WeakSet<object>
+): unknown => {
+  if (value === null) return null;
 
   const t = typeof value;
-  if (t === "string" || t === "number" || t === "boolean") {
-    return value;
-  }
-  if (t === "bigint") {
-    return value.toString();
-  }
-  if (t === "undefined") {
+  if (t === "string" || t === "number" || t === "boolean") return value;
+
+  // Only JSON-serializable values are supported; everything else becomes null.
+  if (
+    t === "bigint" ||
+    t === "function" ||
+    t === "symbol" ||
+    t === "undefined"
+  ) {
     return null;
   }
-  if (t === "function") {
-    return "[Function]";
-  }
-  if (t === "symbol") {
-    return value.toString();
-  }
 
-  if (value instanceof Date) {
-    return value.toISOString();
-  }
-  if (value instanceof RegExp) {
-    return value.toString();
-  }
+  if (t !== "object") return null;
 
   if (Array.isArray(value)) {
-    return value.map((item) => normalizeJsonValue(item, seen));
-  }
-
-  if (value instanceof Map) {
-    const normalized = Array.from(value.entries()).map(([k, v]) => [
-      normalizeJsonValue(k, seen),
-      normalizeJsonValue(v, seen),
-    ]);
-    normalized.sort((a, b) =>
-      JSON.stringify(a[0]).localeCompare(JSON.stringify(b[0]))
-    );
-    return normalized;
-  }
-
-  if (value instanceof Set) {
-    const normalized = Array.from(value.values()).map((v) =>
-      normalizeJsonValue(v, seen)
-    );
-    normalized.sort((a, b) =>
-      JSON.stringify(a).localeCompare(JSON.stringify(b))
-    );
-    return normalized;
-  }
-
-  if (typeof value === "object") {
-    if (seen.has(value)) {
-      return "[Circular]";
-    }
-    seen.add(value);
-
-    const obj = value as Record<string, unknown>;
-    const keys = Object.keys(obj).sort((a, b) => a.localeCompare(b));
-    const out: Record<string, unknown> = {};
-    for (const key of keys) {
-      out[key] = normalizeJsonValue(obj[key], seen);
-    }
+    if (stack.has(value)) return "[Circular]";
+    stack.add(value);
+    const out = value.map((item) => normalizeJsonValue(item, stack));
+    stack.delete(value);
     return out;
   }
 
-  return String(value);
+  if (!isPlainObject(value)) return null;
+
+  if (stack.has(value)) return "[Circular]";
+  stack.add(value);
+
+  const keys = Object.keys(value).sort(compareStringKeys);
+  const out: Record<string, unknown> = {};
+  for (const key of keys) {
+    out[key] = normalizeJsonValue(value[key], stack);
+  }
+
+  stack.delete(value);
+  return out;
 };
 
 const stableJsonStringify = (value: unknown): string => {

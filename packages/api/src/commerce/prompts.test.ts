@@ -38,4 +38,31 @@ describe("buildDelegationPrompt", () => {
 
     expect(a).toBe(b);
   });
+
+  it("replaces circular references with a sentinel", () => {
+    const obj: Record<string, unknown> & { self?: unknown } = { a: 1 };
+    obj.self = obj;
+
+    const prompt = buildDelegationPrompt({
+      kind: "cycle_check",
+      input: obj,
+      session: { id: "sess_cycle", intent: "unknown" },
+    });
+
+    expect(prompt).toContain('"self": "[Circular]"');
+  });
+
+  it("detects circular references in arrays", () => {
+    const arr: unknown[] = [1];
+    arr.push(arr);
+
+    const prompt = buildDelegationPrompt({
+      kind: "cycle_check_array",
+      input: arr,
+      session: { id: "sess_cycle_arr", intent: "unknown" },
+    });
+
+    expect(prompt).toContain("[Circular]");
+    expect(prompt).toContain("Input JSON:");
+  });
 });
