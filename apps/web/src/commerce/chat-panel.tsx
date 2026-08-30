@@ -380,14 +380,6 @@ export const ChatPanel = (props: {
                                         if (disabled) {
                                           return;
                                         }
-                                        if (
-                                          cta.action === "buy" &&
-                                          !window.confirm(
-                                            `Adicionar ${c.title} (${c.price})?\n\nConfirma seguir para compra?`
-                                          )
-                                        ) {
-                                          return;
-                                        }
                                         await sendEnvelope({
                                           payload: {
                                             action: cta.action,

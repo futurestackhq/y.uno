@@ -767,7 +767,14 @@ const runSpecializedPlanNode = async (db: Db, job: JobRow) => {
         eq(schema.connectionCatalogItems.id, String(input.itemId ?? input.id))
       )
       .limit(1);
-    result = { item: item ?? null };
+    result = {
+      item: item
+        ? {
+            ...item,
+            attributes: parseJson<Record<string, unknown>>(item.attributesJson),
+          }
+        : null,
+    };
   } else if (job.kind === "create_order") {
     const itemId = String(input.catalogItemId ?? input.itemId ?? "");
     const [item] = await db
@@ -893,17 +900,27 @@ const runJob = async (db: Db, job: JobRow, model?: HostModel) => {
         text: "Synthesize completed plan results",
         userId: session.userId,
       } as Envelope;
-      const decision = await runHostSynthesis({
-        context: nodeJobs.map((node) => ({
-          error: node.errorText,
-          nodeId: node.nodeId,
-          result: node.resultJson,
-          status: node.status,
-        })),
-        db,
-        envelope,
-        model,
-      });
+      const detailJob = nodeJobs.find(
+        (node) => node.nodeId === "catalog_details" && node.status === "done"
+      );
+      const detailResult = detailJob
+        ? parseJson<{ item?: { attributes?: { description?: unknown }; subtitle?: string | null; title?: string } }>(detailJob.resultJson)
+        : null;
+      const detailItem = detailResult?.item;
+      const decision = detailItem?.title
+        ? {
+            assistantMessage: {
+              content: {
+                text: `${detailItem.title}\n\n${typeof detailItem.attributes?.description === "string" ? detailItem.attributes.description : detailItem.subtitle ?? "Confira os detalhes deste produto antes de adicionar ao pedido."}`,
+              },
+              type: "text" as const,
+            },
+            nextAction: "await_user" as const,
+          }
+        : await runHostSynthesis({
+            context: nodeJobs.map((node) => ({ error: node.errorText, nodeId: node.nodeId, result: node.resultJson, status: node.status })),
+            db, envelope, model,
+          });
       const failedNodes = nodeJobs.filter(
         (node) => node.nodeId !== "host_synthesis" && node.status === "failed"
       );
