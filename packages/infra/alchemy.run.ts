@@ -57,10 +57,25 @@ export default Alchemy.Stack(
       name: "web",
       rootDir: "../../apps/web",
     });
+    const whatsWorker = yield* Cloudflare.Website.Vite("whats", {
+      assets: {
+        htmlHandling: "auto-trailing-slash",
+        notFoundHandling: "single-page-application",
+      },
+      dev: {
+        port: 3002,
+      },
+      env: {
+        VITE_SERVER_URL: serverWorker.url.as<string>(),
+      },
+      name: "whats",
+      rootDir: "../../apps/whats",
+    });
 
     return {
       server: serverWorker.url,
       web: webWorker.url,
+      whats: whatsWorker.url,
     };
   })
 );

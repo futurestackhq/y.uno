@@ -25,7 +25,7 @@ jobs:
       - name: Install
         run: bun install --frozen-lockfile
 
-      - name: Deploy (Alchemy → Workers + D1)
+      - name: Deploy (Alchemy → Workers, static sites + D1)
         working-directory: packages/infra
         run: bun run deploy -- --stage test --yes
         env:

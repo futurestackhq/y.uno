@@ -22,7 +22,7 @@ The host agent understands the conversation and creates a durable plan. The runt
 ## Applications
 
 - `apps/web` — merchant onboarding, catalog management, order overview, and orchestration inspector.
-- `apps/whats` — standalone WhatsApp-inspired customer commerce experience.
+- `apps/whats` — standalone WhatsApp-inspired customer commerce experience, deployed as a Cloudflare static site.
 - `apps/server` — Hono/tRPC API runtime deployed to Cloudflare Workers.
 - `packages/api` — commerce domain, host-agent orchestration, jobs, prompts, and tests.
 - `packages/db` — Drizzle schema, migrations, and D1 access.
@@ -143,7 +143,7 @@ gh secret set CLOUDFLARE_ACCOUNT_ID
 
 ### Alchemy (local)
 
-- Target: web on Cloudflare + server on Cloudflare
+- Target: web, WhatsApp experience, and server on Cloudflare
 - Configure provider login: `cd packages/infra && bunx alchemy login --configure`
 - Dev: bun run dev
 - Deploy: bun run deploy
@@ -159,7 +159,7 @@ cd packages/infra && bunx alchemy deploy --stage production
 
 ### Production origins
 
-- Required after the first deploy: set `CORS_ORIGIN` in `apps/server/.env` to the exact deployed web origin, such as `https://app.example.com`, then deploy the server again.
+- Required after the first deploy: set `CORS_ORIGIN` in `apps/server/.env` to the exact deployed web and WhatsApp origins, then deploy the server again. Use `*` temporarily if both sites must call the API before their final URLs are known.
 
 ## Project Structure
 
