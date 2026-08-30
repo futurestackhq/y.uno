@@ -4,7 +4,7 @@ import { and, desc, eq } from "drizzle-orm";
 
 import { logEvent } from "./events";
 import { buildPlan, normalizePlanJson } from "./plan";
-import { envelopeSchema } from "./types";
+import { envelopeSchema, getInboundFollowUpText } from "./types";
 import type { Envelope } from "./types";
 
 const nowIso = () => new Date().toISOString();
@@ -142,7 +142,7 @@ const handleUserText = async (
     data: {
       envelopeType: envelope.type,
       messageQueueId: meta.messageQueueId,
-      text,
+      text: envelope.text,
     },
     eventType: "envelope_received",
     level: "info",
@@ -150,7 +150,7 @@ const handleUserText = async (
   });
 
   await addMessage(db, {
-    content: { text },
+    content: { text: envelope.text },
     role: "user",
     sessionId: session.id,
     type: "text",
@@ -204,6 +204,14 @@ const handleQuickReply = async (
   envelope: Extract<Envelope, { type: "quick_reply" }>,
   meta: { messageQueueId: string }
 ) => {
+  const session = await ensureSession(db, {
+    requestedSessionId: envelope.sessionId,
+    userId: envelope.userId,
+  });
+  if (!session) {
+    throw new Error("Commerce session not found");
+  }
+
   await logEvent(db, {
     data: {
       action: envelope.action,
@@ -238,6 +246,59 @@ const handleQuickReply = async (
     level: "info",
     sessionId: envelope.sessionId,
   });
+
+  await enqueueInboundHostFollowUp(
+    db,
+    envelope,
+    meta.messageQueueId,
+    session.id
+  );
+};
+
+const enqueueInboundHostFollowUp = async (
+  db: Db,
+  envelope: Exclude<Envelope, { type: "user_text" }>,
+  messageQueueId: string,
+  sessionId: string
+) => {
+  const jobId = crypto.randomUUID();
+  const ts = nowIso();
+  await db.insert(schema.jobs).values({
+    attempts: 0,
+    createdAt: ts,
+    errorText: null,
+    finishedAt: null,
+    id: jobId,
+    inputJson: JSON.stringify({
+      envelope,
+      messageQueueId,
+      followUpText: getInboundFollowUpText(envelope),
+    }),
+    kind: "host_plan",
+    leaseExpiresAt: null,
+    nextRunAt: ts,
+    promptText: null,
+    resultJson: null,
+    sessionId,
+    startedAt: null,
+    status: "queued",
+    subagentName: "conversational-host",
+    updatedAt: ts,
+  });
+  await logEvent(db, {
+    data: { jobKind: "host_plan", trigger: envelope.type },
+    eventType: "delegation_created",
+    jobId,
+    level: "info",
+    sessionId,
+  });
+  await logEvent(db, {
+    data: { jobKind: "host_plan", trigger: envelope.type },
+    eventType: "job_queued",
+    jobId,
+    level: "info",
+    sessionId,
+  });
 };
 
 const handleCheckoutReturned = async (
@@ -245,6 +306,13 @@ const handleCheckoutReturned = async (
   envelope: Extract<Envelope, { type: "checkout_returned" }>,
   meta: { messageQueueId: string }
 ) => {
+  const session = await ensureSession(db, {
+    requestedSessionId: envelope.sessionId,
+    userId: envelope.userId,
+  });
+  if (!session) {
+    throw new Error("Commerce session not found");
+  }
   await logEvent(db, {
     data: {
       messageQueueId: meta.messageQueueId,
@@ -262,6 +330,13 @@ const handleCheckoutReturned = async (
     level: envelope.status === "paid" ? "info" : "warn",
     sessionId: envelope.sessionId,
   });
+
+  await enqueueInboundHostFollowUp(
+    db,
+    envelope,
+    meta.messageQueueId,
+    session.id
+  );
 };
 
 export const dispatchOnce = async (db: Db) => {

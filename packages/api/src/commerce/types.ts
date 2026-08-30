@@ -64,3 +64,13 @@ export const envelopeSchema = z.discriminatedUnion("type", [
 ]);
 
 export type Envelope = z.infer<typeof envelopeSchema>;
+
+export const getInboundFollowUpText = (envelope: Envelope): string => {
+  if (envelope.type === "user_text") {
+    return envelope.text;
+  }
+  if (envelope.type === "quick_reply") {
+    return `User selected quick reply: ${envelope.action}`;
+  }
+  return `Checkout returned with status: ${envelope.status}`;
+};
