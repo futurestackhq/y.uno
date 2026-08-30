@@ -55,6 +55,7 @@ interface CarouselCard {
   merchant: string;
   price: string;
   catalogItemId?: string;
+  imageUrl?: string | null;
   ctas: { action: string; label: string }[];
 }
 
@@ -161,6 +162,7 @@ const normalizeCarouselCard = (raw: unknown): CarouselCard | null => {
     title?: unknown;
     subtitle?: unknown;
     price?: unknown;
+    imageUrl?: unknown;
     buttons?: unknown;
   };
 
@@ -171,6 +173,7 @@ const normalizeCarouselCard = (raw: unknown): CarouselCard | null => {
     merchant?: unknown;
     title?: unknown;
     subtitle?: unknown;
+    imageUrl?: unknown;
     price?: unknown;
     ctas?: unknown;
   };
@@ -202,6 +205,7 @@ const normalizeCarouselCard = (raw: unknown): CarouselCard | null => {
     catalogItemId: getString(plan.itemId) ?? getString(backend.id) ?? id,
     ctas,
     id,
+    imageUrl: getString(backend.imageUrl) ?? getString(plan.imageUrl),
     merchant,
     price,
     subtitle,
@@ -342,6 +346,13 @@ export const ChatPanel = (props: {
                               className="bg-background/50 w-60 shrink-0 snap-start scroll-mx-2 rounded border p-3"
                               key={c.id}
                             >
+                              {c.imageUrl ? (
+                                <img
+                                  alt={c.title}
+                                  className="mb-3 aspect-square w-full rounded object-cover"
+                                  src={c.imageUrl}
+                                />
+                              ) : null}
                               <div className="text-xs font-medium">
                                 {c.title}
                               </div>

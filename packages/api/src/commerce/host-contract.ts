@@ -246,6 +246,7 @@ export const hostSynthesisOutputSchema = z
               catalogItemId: z.string().min(1).max(200).nullable(),
               ctas: carouselCtaSchema,
               id: z.string().min(1).max(200),
+              imageUrl: z.string().url().nullable(),
               merchant: z.string().min(1).max(200),
               price: z.string().min(1).max(120),
               subtitle: z.string().max(500).nullable(),

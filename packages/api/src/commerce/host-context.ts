@@ -38,6 +38,7 @@ export interface CatalogItemSummary {
   priceCents: number;
   currency: string;
   connectionId: string;
+  imageUrl: string | null;
 }
 
 export interface HostContextSnapshot {
@@ -145,6 +146,7 @@ export const assembleHostContext = async (
         connectionId: schema.connectionCatalogItems.connectionId,
         currency: schema.connectionCatalogItems.currency,
         id: schema.connectionCatalogItems.id,
+        imageUrl: schema.connectionCatalogItems.imageUrl,
         kind: schema.connectionCatalogItems.kind,
         priceCents: schema.connectionCatalogItems.priceCents,
         subtitle: schema.connectionCatalogItems.subtitle,

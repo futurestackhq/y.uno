@@ -213,6 +213,7 @@ describe("host contracts", () => {
                 { action: "buy", label: "Buy" },
               ],
               id: "sku_1",
+              imageUrl: "https://example.com/pet-food.jpg",
               merchant: "Pet store",
               price: "R$ 89,90",
               subtitle: null,
